@@ -20,6 +20,7 @@ import (
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
+	logpb "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/logs/v1"
 )
 
 // MetricsData is a struct that groups proto metrics with a unique node and a resource.
@@ -34,5 +35,13 @@ type TraceData struct {
 	Node         *commonpb.Node
 	Resource     *resourcepb.Resource
 	Spans        []*tracepb.Span
+	SourceFormat string
+}
+
+// LogData is a struct that groups proto logs with a unique node and a resource.
+type LogData struct {
+	Node         *commonpb.Node
+	Resource     *resourcepb.Resource
+	Logs        []*logpb.LogRecord
 	SourceFormat string
 }

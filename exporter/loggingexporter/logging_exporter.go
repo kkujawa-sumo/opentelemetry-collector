@@ -29,6 +29,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/consumer/pdatautil"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
+	"go.opentelemetry.io/collector/internal/data"
 )
 
 type logDataBuffer struct {
@@ -215,6 +216,15 @@ func (s *loggingExporter) pushMetricsData(
 	return 0, nil
 }
 
+func (s *loggingExporter) pushLogData(
+	_ context.Context,
+	md data.Logs,
+) (int, error) {
+	s.logger.Info("LogExporter", zap.Int("#log", 5))
+
+	return 0, nil
+}
+
 // NewTraceExporter creates an exporter.TraceExporter that just drops the
 // received data and logs debugging messages.
 func NewTraceExporter(config configmodels.Exporter, level string, logger *zap.Logger) (component.TraceExporter, error) {
@@ -241,6 +251,21 @@ func NewMetricsExporter(config configmodels.Exporter, level string, logger *zap.
 	return exporterhelper.NewMetricsExporter(
 		config,
 		s.pushMetricsData,
+		exporterhelper.WithShutdown(loggerSync(logger)),
+	)
+}
+
+// NewLogExporter creates an exporter.LogExporter that just drops the
+// received data and logs debugging messages.
+func NewLogExporter(config configmodels.Exporter, level string, logger *zap.Logger) (component.LogExporter, error) {
+	s := &loggingExporter{
+		debug:  level == "debug",
+		logger: logger,
+	}
+
+	return exporterhelper.NewLogExporter(
+		config,
+		s.pushLogData,
 		exporterhelper.WithShutdown(loggerSync(logger)),
 	)
 }
