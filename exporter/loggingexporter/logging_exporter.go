@@ -218,9 +218,19 @@ func (s *loggingExporter) pushMetricsData(
 
 func (s *loggingExporter) pushLogData(
 	_ context.Context,
-	md data.Logs,
+	ld data.Logs,
 ) (int, error) {
-	s.logger.Info("LogExporter", zap.Int("#log", 5))
+	s.logger.Info("LogExporter", zap.Int("#logs", ld.LogRecordCount()))
+
+	for i := 0; i < ld.ResourceLogs().Len(); i++ {
+		rs := ld.ResourceLogs().At(i)
+		for j := 0; j < rs.Logs().Len(); j++ {
+			log := rs.Logs().At(j)
+			s.logger.Info("Body", zap.String("Body", log.Body()))
+			val, _ := log.Attributes().Get("pod")
+			s.logger.Info("Attributes", zap.String("Attributes", val.StringVal()))
+		}
+	}
 
 	return 0, nil
 }

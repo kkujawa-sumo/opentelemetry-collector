@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/viper"
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/internal/data"
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/internal/data"
 	"go.uber.org/zap"
 )
 
@@ -37,8 +37,8 @@ type Factory struct {
 }
 
 type dummylogsReceiver struct {
-	config   *Config
-	logger   *zap.Logger
+	config      *Config
+	logger      *zap.Logger
 	LogConsumer consumer.LogConsumer
 }
 
@@ -93,7 +93,7 @@ func (f *Factory) createReceiver(
 ) (component.LogReceiver, error) {
 
 	r := &dummylogsReceiver{
-		config:   config,
+		config: config,
 	}
 
 	return r, nil
@@ -108,7 +108,13 @@ func (f *Factory) CreateLogReceiver(
 	rCfg := cfg.(*Config)
 	receiver, _ := f.createReceiver(rCfg)
 	receiver.(*dummylogsReceiver).LogConsumer = nextConsumer
-	logs := data.Logs{}
+	logs := data.NewLogs()
+	resources := logs.ResourceLogs()
+	resources.Resize(1)
+	resources.At(0).Logs().Resize(1)
+	nlogs := resources.At(0).Logs().At(0)
+	nlogs.SetBody("My example log")
+	nlogs.Attributes().InsertString("pod", "pod_name")
 	nextConsumer.ConsumeLogs(ctx, logs)
 	return receiver, nil
 }
