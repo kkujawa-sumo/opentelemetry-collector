@@ -59,23 +59,6 @@ func (f *Factory) CreateDefaultConfig() configmodels.Receiver {
 // used on the receiver.
 func (f *Factory) CustomUnmarshaler() component.CustomUnmarshaler {
 	return func(sourceViperSection *viper.Viper, intoCfg interface{}) error {
-		if sourceViperSection == nil {
-			// The section is empty nothing to do, using the default config.
-			return nil
-		}
-
-		// Unmarshal but not exact yet so the different keys under config do not
-		// trigger errors, this is needed so that the types of protocol and transport
-		// are read.
-		if err := sourceViperSection.Unmarshal(intoCfg); err != nil {
-			return err
-		}
-
-		// Unmarshal exact to validate the config keys.
-		if err := sourceViperSection.UnmarshalExact(intoCfg); err != nil {
-			return err
-		}
-
 		return nil
 	}
 }
