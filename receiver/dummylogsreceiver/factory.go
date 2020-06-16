@@ -18,6 +18,7 @@ package dummylogsreceiver
 
 import (
 	"context"
+	"time"
 
 	"github.com/spf13/viper"
 	"go.opentelemetry.io/collector/component"
@@ -45,6 +46,20 @@ type dummylogsReceiver struct {
 // Type gets the type of the Receiver config created by this factory.
 func (f *Factory) Type() configmodels.Type {
 	return configmodels.Type(typeStr)
+}
+
+func (f *Factory) generator (ctx context.Context, consumer consumer.LogConsumer) {
+	for {
+		logs := data.NewLogs()
+		resources := logs.ResourceLogs()
+		resources.Resize(1)
+		resources.At(0).Logs().Resize(1)
+		nlogs := resources.At(0).Logs().At(0)
+		nlogs.SetBody("My example log")
+		nlogs.Attributes().InsertString("pod", "pod_name")
+		consumer.ConsumeLogs(ctx, logs)
+		time.Sleep(1e9)
+	}
 }
 
 // CreateDefaultConfig creates the default configuration for JaegerLegacy receiver.
@@ -91,13 +106,7 @@ func (f *Factory) CreateLogReceiver(
 	rCfg := cfg.(*Config)
 	receiver, _ := f.createReceiver(rCfg)
 	receiver.(*dummylogsReceiver).LogConsumer = nextConsumer
-	logs := data.NewLogs()
-	resources := logs.ResourceLogs()
-	resources.Resize(1)
-	resources.At(0).Logs().Resize(1)
-	nlogs := resources.At(0).Logs().At(0)
-	nlogs.SetBody("My example log")
-	nlogs.Attributes().InsertString("pod", "pod_name")
-	nextConsumer.ConsumeLogs(ctx, logs)
+
+	go f.generator(ctx, nextConsumer)
 	return receiver, nil
 }
