@@ -227,8 +227,9 @@ func (s *loggingExporter) pushLogData(
 		for j := 0; j < rs.Logs().Len(); j++ {
 			log := rs.Logs().At(j)
 			s.logger.Info("Body", zap.String("Body", log.Body()))
-			val, _ := log.Attributes().Get("pod")
-			s.logger.Info("Attributes", zap.String("Attributes", val.StringVal()))
+			log.Attributes().ForEach(func(key string, value pdata.AttributeValue) {
+				s.logger.Info("Attributes", zap.String(key, value.StringVal()))
+			})
 		}
 	}
 
