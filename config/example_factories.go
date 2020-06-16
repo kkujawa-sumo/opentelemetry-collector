@@ -26,7 +26,7 @@ import (
 	"go.opentelemetry.io/collector/config/configprotocol"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumerdata"
-	"go.opentelemetry.io/collector/internal/data"
+	"go.opentelemetry.io/collector/consumer/pdata"
 )
 
 // ExampleReceiver is for testing purposes. We are defining an example config and factory
@@ -299,7 +299,7 @@ func (f *ExampleExporterFactory) CreateLogExporter(
 type ExampleExporterConsumer struct {
 	Traces           []consumerdata.TraceData
 	Metrics          []consumerdata.MetricsData
-	Logs             []data.Logs
+	Logs             []pdata.Logs
 	ExporterStarted  bool
 	ExporterShutdown bool
 }
@@ -324,7 +324,7 @@ func (exp *ExampleExporterConsumer) ConsumeMetricsData(ctx context.Context, md c
 	return nil
 }
 
-func (exp *ExampleExporterConsumer) ConsumeLogs(ctx context.Context, ld data.Logs) error {
+func (exp *ExampleExporterConsumer) ConsumeLogs(ctx context.Context, ld pdata.Logs) error {
 	exp.Logs = append(exp.Logs, ld)
 	return nil
 }
@@ -414,7 +414,7 @@ func (ep *ExampleProcessor) GetCapabilities() component.ProcessorCapabilities {
 	return component.ProcessorCapabilities{MutatesConsumedData: false}
 }
 
-func (ep *ExampleProcessor) ConsumeLogs(ctx context.Context, ld data.Logs) error {
+func (ep *ExampleProcessor) ConsumeLogs(ctx context.Context, ld pdata.Logs) error {
 	return ep.nextConsumer.ConsumeLogs(ctx, ld)
 }
 

@@ -20,7 +20,6 @@ import (
 
 	"go.opentelemetry.io/collector/consumer/consumerdata"
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/internal/data"
 )
 
 // MetricsConsumerBase defines a common interface for MetricsConsumerOld and MetricsConsumer.
@@ -66,5 +65,5 @@ type TraceConsumer interface {
 // as needed, and sends it to the next processing node if any or to the destination.
 type LogConsumer interface {
 	// ConsumeLogs receives data.Logs for processing.
-	ConsumeLogs(ctx context.Context, ld data.Logs) error
+	ConsumeLogs(ctx context.Context, ld pdata.Logs) error
 }

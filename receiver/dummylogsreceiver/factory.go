@@ -24,7 +24,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/internal/data"
+	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.uber.org/zap"
 )
 
@@ -50,7 +50,7 @@ func (f *Factory) Type() configmodels.Type {
 
 func (f *Factory) generator (ctx context.Context, consumer consumer.LogConsumer) {
 	for {
-		logs := data.NewLogs()
+		logs := pdata.NewLogs()
 		resources := logs.ResourceLogs()
 		resources.Resize(1)
 		resources.At(0).Logs().Resize(1)
