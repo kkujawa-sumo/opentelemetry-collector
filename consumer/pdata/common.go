@@ -18,7 +18,6 @@ package pdata
 // such as timestamps, attributes, etc.
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
