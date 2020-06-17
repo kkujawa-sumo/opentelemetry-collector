@@ -224,13 +224,12 @@ func (s *loggingExporter) pushLogData(
 	for i := 0; i < ld.ResourceLogs().Len(); i++ {
 		rs := ld.ResourceLogs().At(i)
 		for j := 0; j < rs.Logs().Len(); j++ {
+			buf := logDataBuffer{}
 			log := rs.Logs().At(j)
-			s.logger.Info("Body", zap.String("Body", log.Body()))
-			s.logger.Info("Count", zap.Int("Count", log.Attributes().Len()))
-			log.Attributes().ForEach(func(key string, value pdata.AttributeValue) {
-				fmt.Printf("We are here")
-				s.logger.Info("Attributes", zap.String(key, value.StringVal()))
-			})
+
+			buf.logEntry(log.Body())
+			buf.logAttributeMap("Attributes", log.Attributes())
+			s.logger.Info(buf.str.String())
 		}
 	}
 
