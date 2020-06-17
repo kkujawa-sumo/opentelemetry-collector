@@ -228,6 +228,7 @@ func (s *loggingExporter) pushLogData(
 			s.logger.Info("Body", zap.String("Body", log.Body()))
 			s.logger.Info("Count", zap.Int("Count", log.Attributes().Len()))
 			log.Attributes().ForEach(func(key string, value pdata.AttributeValue) {
+				fmt.Printf("We are here")
 				s.logger.Info("Attributes", zap.String(key, value.StringVal()))
 			})
 		}
