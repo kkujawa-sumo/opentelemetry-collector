@@ -18,6 +18,7 @@ package pdata
 // such as timestamps, attributes, etc.
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -646,6 +647,7 @@ func (am AttributeMap) Len() int {
 // })
 func (am AttributeMap) ForEach(f func(k string, v AttributeValue)) {
 	for _, kv := range *am.orig {
+		fmt.Printf("Key: %s, value: %s", kv.Key, AttributeValue{kv}.StringVal())
 		if kv == nil {
 			continue
 		}
