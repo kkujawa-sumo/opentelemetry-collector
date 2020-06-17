@@ -647,8 +647,9 @@ func (am AttributeMap) Len() int {
 // })
 func (am AttributeMap) ForEach(f func(k string, v AttributeValue)) {
 	for _, kv := range *am.orig {
-		fmt.Printf("Key: %s, value: %s", kv.Key, AttributeValue{kv}.StringVal())
+		fmt.Printf("Key: %s, value: %s\n", kv.Key, AttributeValue{kv}.StringVal())
 		if kv == nil {
+			fmt.Printf("Kv is nil")
 			continue
 		}
 		f(kv.Key, AttributeValue{&kv.Value})
