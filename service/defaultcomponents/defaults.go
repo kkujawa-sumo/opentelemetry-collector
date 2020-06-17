@@ -38,7 +38,6 @@ import (
 	"go.opentelemetry.io/collector/processor/samplingprocessor/probabilisticsamplerprocessor"
 	"go.opentelemetry.io/collector/processor/samplingprocessor/tailsamplingprocessor"
 	"go.opentelemetry.io/collector/processor/spanprocessor"
-	"go.opentelemetry.io/collector/receiver/dummylogsreceiver"
 	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver"
 	"go.opentelemetry.io/collector/receiver/jaegerreceiver"
 	"go.opentelemetry.io/collector/receiver/opencensusreceiver"
@@ -66,7 +65,6 @@ func Components() (
 	}
 
 	receivers, err := component.MakeReceiverFactoryMap(
-		&dummylogsreceiver.Factory{},
 		&jaegerreceiver.Factory{},
 		&zipkinreceiver.Factory{},
 		&prometheusreceiver.Factory{},
