@@ -228,6 +228,9 @@ func (s *loggingExporter) pushLogData(
 			log := rs.Logs().At(j)
 
 			buf.logEntry(log.Body())
+			if !rs.Resource().IsNil() {
+				buf.logAttributeMap("Resource Attributes", rs.Resource().Attributes())
+			}
 			buf.logAttributeMap("Attributes", log.Attributes())
 			s.logger.Info(buf.str.String())
 		}
