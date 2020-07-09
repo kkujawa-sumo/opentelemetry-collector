@@ -16,6 +16,8 @@ Multiple policies exist today and it is straight forward to add more. These incl
 - `numeric_attribute`: Sample based on number attributes
 - `string_attribute`: Sample based on string attributes
 - `rate_limiting`: Sample based on rate
+- `cascading`: Sample based on a set of cascading rules
+- `duration`: Sample based on duration of trace (difference between maximum end time and minimum start time)
 
 The following configuration options can also be modified:
 - `decision_wait` (default = 30s): Wait time since the first span of a trace before making a sampling decision
@@ -50,7 +52,38 @@ processors:
             name: test-policy-4,
             type: rate_limiting,
             rate_limiting: {spans_per_second: 35}
-         }
+          },
+          {
+            name: test-policy-5,
+            type: cascading,
+
+            # This is total budget available for the policy
+            spans_per_second: 1000,
+            rules: [
+              {
+                # This rule will consume no more than 150 spans_per_second for the traces with matching spans
+                name: "some-name",
+                spans_per_second: 150,
+                numeric_attribute: {key: key1, min_value: 50, max_value: 100}
+              },
+              {
+                name: "some-other-name",
+                spans_per_second: 50,
+                duration: {min_duration_micros: 9000000 }
+              },
+              {
+                # This rule will match anything and take any left bandwidth available, up to 
+                # spans_per_second defined at the top level
+                name: "capture-anything-else",
+                spans_per_second: -1
+              }
+            ]
+        },
+        {
+           name: test-policy-6,
+           type: duration,
+           duration: {min_duration_micros: 100000}
+        },
       ]
 ```
 

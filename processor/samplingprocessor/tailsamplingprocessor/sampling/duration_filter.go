@@ -16,25 +16,23 @@ package sampling
 
 import (
 	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
 )
 
-type numericAttributeFilter struct {
-	key                string
-	minValue, maxValue int64
-	logger             *zap.Logger
+type durationFilter struct {
+	minDurationMicros int64
+	logger            *zap.Logger
 }
 
-var _ PolicyEvaluator = (*numericAttributeFilter)(nil)
+var _ PolicyEvaluator = (*durationFilter)(nil)
 
-// NewNumericAttributeFilter creates a policy evaluator that samples all traces with
-// the given attribute in the given numeric range.
-func NewNumericAttributeFilter(logger *zap.Logger, key string, minValue, maxValue int64) PolicyEvaluator {
-	return &numericAttributeFilter{
-		key:      key,
-		minValue: minValue,
-		maxValue: maxValue,
-		logger:   logger,
+// NewDurationFilter creates a policy evaluator that samples all traces with
+// the duration exceeding min duration
+func NewDurationFilter(logger *zap.Logger, minDurationMicros int64) PolicyEvaluator {
+	return &durationFilter{
+		minDurationMicros: minDurationMicros,
+		logger:            logger,
 	}
 }
 
@@ -42,34 +40,52 @@ func NewNumericAttributeFilter(logger *zap.Logger, key string, minValue, maxValu
 // after the sampling decision was already taken for the trace.
 // This gives the evaluator a chance to log any message/metrics and/or update any
 // related internal state.
-func (naf *numericAttributeFilter) OnLateArrivingSpans(earlyDecision Decision, spans []*tracepb.Span) error {
-	naf.logger.Debug("Triggering action for late arriving spans in numeric-attribute filter")
+func (df *durationFilter) OnLateArrivingSpans(earlyDecision Decision, spans []*tracepb.Span) error {
 	return nil
 }
 
 // EvaluateSecondChance looks at the trace again and if it can/cannot be fit, returns a SamplingDecision
-func (naf *numericAttributeFilter) EvaluateSecondChance(traceID []byte, trace *TraceData) (Decision, error) {
+func (df *durationFilter) EvaluateSecondChance(traceID []byte, trace *TraceData) (Decision, error) {
 	return NotSampled, nil
 }
 
+func tsToMicros(ts *timestamp.Timestamp) int64 {
+	return ts.Seconds*1000000 + int64(ts.Nanos/1000)
+}
+
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (naf *numericAttributeFilter) Evaluate(traceID []byte, trace *TraceData) (Decision, error) {
-	naf.logger.Debug("Evaluating spans in numeric-attribute filter")
+func (df *durationFilter) Evaluate(traceID []byte, trace *TraceData) (Decision, error) {
 	trace.Lock()
 	batches := trace.ReceivedBatches
 	trace.Unlock()
+
+	minStartTime := int64(0)
+	maxEndTime := int64(0)
 	for _, batch := range batches {
 		for _, span := range batch.Spans {
-			if span == nil || span.Attributes == nil {
+			if span == nil {
 				continue
 			}
-			if v, ok := span.Attributes.AttributeMap[naf.key]; ok {
-				value := v.GetIntValue()
-				if value >= naf.minValue && value <= naf.maxValue {
-					return Sampled, nil
+			startTs := tsToMicros(span.StartTime)
+			endTs := tsToMicros(span.EndTime)
+
+			if minStartTime == 0 {
+				minStartTime = startTs
+				maxEndTime = endTs
+			} else {
+				if startTs < minStartTime {
+					minStartTime = startTs
+				}
+				if endTs > maxEndTime {
+					maxEndTime = endTs
 				}
 			}
 		}
+	}
+
+	// Sanity check first
+	if maxEndTime > minStartTime && maxEndTime-minStartTime >= df.minDurationMicros {
+		return Sampled, nil
 	}
 
 	return NotSampled, nil
@@ -77,7 +93,6 @@ func (naf *numericAttributeFilter) Evaluate(traceID []byte, trace *TraceData) (D
 
 // OnDroppedSpans is called when the trace needs to be dropped, due to memory
 // pressure, before the decision_wait time has been reached.
-func (naf *numericAttributeFilter) OnDroppedSpans(traceID []byte, trace *TraceData) (Decision, error) {
-	naf.logger.Debug("Triggering action for dropped spans in numeric-attribute filter")
+func (df *durationFilter) OnDroppedSpans(traceID []byte, trace *TraceData) (Decision, error) {
 	return NotSampled, nil
 }
