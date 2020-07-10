@@ -176,9 +176,9 @@ func (oce *otlpExporter) pushMetricsData(ctx context.Context, md pdata.Metrics) 
 	return 0, nil
 }
 
-func (oce *otlpExporter) pushLogData(ctx context.Context, logs data.Logs) (int, error) {
+func (oce *otlpExporter) pushLogData(ctx context.Context, logs pdata.Logs) (int, error) {
 	request := &otlplogs.ExportLogServiceRequest{
-		ResourceLogs: data.LogsToProto(logs),
+		ResourceLogs: pdata.LogsToProto(logs),
 	}
 	err := oce.exporter.exportLogs(ctx, request)
 

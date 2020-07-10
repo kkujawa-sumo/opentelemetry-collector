@@ -19,13 +19,13 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configmodels"
-	"go.opentelemetry.io/collector/internal/data"
+	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/obsreport"
 )
 
 // PushLogsData is a helper function that is similar to ConsumeLogsData but also returns
 // the number of dropped logs.
-type PushLogsData func(ctx context.Context, md data.Logs) (droppedTimeSeries int, err error)
+type PushLogsData func(ctx context.Context, md pdata.Logs) (droppedTimeSeries int, err error)
 
 type logsExporter struct {
 	exporterFullName string
@@ -37,7 +37,7 @@ func (me *logsExporter) Start(ctx context.Context, host component.Host) error {
 	return nil
 }
 
-func (me *logsExporter) ConsumeLogs(ctx context.Context, md data.Logs) error {
+func (me *logsExporter) ConsumeLogs(ctx context.Context, md pdata.Logs) error {
 	exporterCtx := obsreport.ExporterContext(ctx, me.exporterFullName)
 	_, err := me.pushLogsData(exporterCtx, md)
 	return err
@@ -76,7 +76,7 @@ func NewLogsExporter(config configmodels.Exporter, pushLogsData PushLogsData, op
 }
 
 func pushLogsWithObservability(next PushLogsData, exporterName string) PushLogsData {
-	return func(ctx context.Context, ld data.Logs) (int, error) {
+	return func(ctx context.Context, ld pdata.Logs) (int, error) {
 		ctx = obsreport.StartLogsExportOp(ctx, exporterName)
 		numDroppedLogs, err := next(ctx, ld)
 
