@@ -206,6 +206,10 @@ func (s *loggingExporter) pushMetricsData(
 
 				buf.logMetricDescriptor(metric.MetricDescriptor())
 
+				buf.logEntry("DoubleDataPoints:")
+				for i := 0; i < metric.DoubleDataPoints().Len(); i++ {
+					buf.logEntry("%d %f", metric.DoubleDataPoints().At(i).Timestamp(), metric.DoubleDataPoints().At(i).Value())
+				}
 				// TODO: Add logging for the rest of the metric properties: points.
 			}
 		}
