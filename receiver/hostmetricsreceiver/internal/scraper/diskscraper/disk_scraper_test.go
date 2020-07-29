@@ -16,8 +16,11 @@ package diskscraper
 
 import (
 	"context"
+	"errors"
+	"runtime"
 	"testing"
 
+	"github.com/shirou/gopsutil/disk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,35 +28,81 @@ import (
 	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver/internal"
 )
 
-type validationFn func(*testing.T, pdata.MetricSlice)
-
 func TestScrapeMetrics(t *testing.T) {
-	createScraperAndValidateScrapedMetrics(t, &Config{}, func(t *testing.T, metrics pdata.MetricSlice) {
-		// expect 3 metrics
-		assert.Equal(t, 3, metrics.Len())
+	type testCase struct {
+		name              string
+		bootTimeFunc      func() (uint64, error)
+		ioCountersFunc    func(names ...string) (map[string]disk.IOCountersStat, error)
+		expectedStartTime pdata.TimestampUnixNano
+		initializationErr string
+		expectedErr       string
+	}
 
-		// for each disk metric, expect a read & write datapoint for at least one drive
-		assertDiskMetricMatchesDescriptorAndHasReadAndWriteDataPoints(t, metrics.At(0), metricDiskBytesDescriptor)
-		assertDiskMetricMatchesDescriptorAndHasReadAndWriteDataPoints(t, metrics.At(1), metricDiskOpsDescriptor)
-		assertDiskMetricMatchesDescriptorAndHasReadAndWriteDataPoints(t, metrics.At(2), metricDiskTimeDescriptor)
-	})
+	testCases := []testCase{
+		{
+			name: "Standard",
+		},
+		{
+			name:              "Validate Start Time",
+			bootTimeFunc:      func() (uint64, error) { return 100, nil },
+			expectedStartTime: 100 * 1e9,
+		},
+		{
+			name:              "Boot Time Error",
+			bootTimeFunc:      func() (uint64, error) { return 0, errors.New("err1") },
+			initializationErr: "err1",
+		},
+		{
+			name:           "Error",
+			ioCountersFunc: func(names ...string) (map[string]disk.IOCountersStat, error) { return nil, errors.New("err2") },
+			expectedErr:    "err2",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			scraper := newDiskScraper(context.Background(), &Config{})
+			if test.bootTimeFunc != nil {
+				scraper.bootTime = test.bootTimeFunc
+			}
+			if test.ioCountersFunc != nil {
+				scraper.ioCounters = test.ioCountersFunc
+			}
+
+			err := scraper.Initialize(context.Background())
+			if test.initializationErr != "" {
+				assert.EqualError(t, err, test.initializationErr)
+				return
+			}
+			require.NoError(t, err, "Failed to initialize disk scraper: %v", err)
+			defer func() { assert.NoError(t, scraper.Close(context.Background())) }()
+
+			metrics, err := scraper.ScrapeMetrics(context.Background())
+			if test.expectedErr != "" {
+				assert.EqualError(t, err, test.expectedErr)
+				return
+			}
+			require.NoError(t, err, "Failed to scrape metrics: %v", err)
+
+			assert.GreaterOrEqual(t, metrics.Len(), 3)
+
+			assertDiskMetricValid(t, metrics.At(0), diskIODescriptor, test.expectedStartTime)
+			assertDiskMetricValid(t, metrics.At(1), diskOpsDescriptor, test.expectedStartTime)
+			assertDiskMetricValid(t, metrics.At(2), diskTimeDescriptor, test.expectedStartTime)
+
+			if runtime.GOOS == "Linux" {
+				assertDiskMetricValid(t, metrics.At(3), diskMergedDescriptor, test.expectedStartTime)
+			}
+		})
+	}
 }
 
-func assertDiskMetricMatchesDescriptorAndHasReadAndWriteDataPoints(t *testing.T, metric pdata.Metric, expectedDescriptor pdata.MetricDescriptor) {
+func assertDiskMetricValid(t *testing.T, metric pdata.Metric, expectedDescriptor pdata.MetricDescriptor, startTime pdata.TimestampUnixNano) {
 	internal.AssertDescriptorEqual(t, expectedDescriptor, metric.MetricDescriptor())
+	if startTime != 0 {
+		internal.AssertInt64MetricStartTimeEquals(t, metric, startTime)
+	}
 	assert.GreaterOrEqual(t, metric.Int64DataPoints().Len(), 2)
 	internal.AssertInt64MetricLabelHasValue(t, metric, 0, directionLabelName, readDirectionLabelValue)
 	internal.AssertInt64MetricLabelHasValue(t, metric, 1, directionLabelName, writeDirectionLabelValue)
-}
-
-func createScraperAndValidateScrapedMetrics(t *testing.T, config *Config, assertFn validationFn) {
-	scraper := newDiskScraper(context.Background(), config)
-	err := scraper.Initialize(context.Background())
-	require.NoError(t, err, "Failed to initialize disk scraper: %v", err)
-	defer func() { assert.NoError(t, scraper.Close(context.Background())) }()
-
-	metrics, err := scraper.ScrapeMetrics(context.Background())
-	require.NoError(t, err, "Failed to scrape metrics: %v", err)
-
-	assertFn(t, metrics)
 }

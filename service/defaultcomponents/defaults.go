@@ -43,7 +43,6 @@ import (
 	"go.opentelemetry.io/collector/receiver/opencensusreceiver"
 	"go.opentelemetry.io/collector/receiver/otlpreceiver"
 	"go.opentelemetry.io/collector/receiver/prometheusreceiver"
-	"go.opentelemetry.io/collector/receiver/vmmetricsreceiver"
 	"go.opentelemetry.io/collector/receiver/zipkinreceiver"
 )
 
@@ -65,12 +64,11 @@ func Components() (
 	}
 
 	receivers, err := component.MakeReceiverFactoryMap(
-		&jaegerreceiver.Factory{},
+		jaegerreceiver.NewFactory(),
 		&zipkinreceiver.Factory{},
 		&prometheusreceiver.Factory{},
 		&opencensusreceiver.Factory{},
-		&otlpreceiver.Factory{},
-		&vmmetricsreceiver.Factory{},
+		otlpreceiver.NewFactory(),
 		hostmetricsreceiver.NewFactory(),
 	)
 	if err != nil {
@@ -91,15 +89,15 @@ func Components() (
 	}
 
 	processors, err := component.MakeProcessorFactoryMap(
-		&attributesprocessor.Factory{},
-		&resourceprocessor.Factory{},
-		&queuedprocessor.Factory{},
-		&batchprocessor.Factory{},
-		&memorylimiter.Factory{},
+		attributesprocessor.NewFactory(),
+		resourceprocessor.NewFactory(),
+		queuedprocessor.NewFactory(),
+		batchprocessor.NewFactory(),
+		memorylimiter.NewFactory(),
 		&tailsamplingprocessor.Factory{},
 		&probabilisticsamplerprocessor.Factory{},
-		&spanprocessor.Factory{},
-		&filterprocessor.Factory{},
+		spanprocessor.NewFactory(),
+		filterprocessor.NewFactory(),
 	)
 	if err != nil {
 		errs = append(errs, err)

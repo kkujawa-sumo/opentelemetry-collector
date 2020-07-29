@@ -30,6 +30,10 @@ type Config struct {
 	// SendBatchSize is the size of a batch which after hit, will trigger it to be sent.
 	SendBatchSize uint32 `mapstructure:"send_batch_size,omitempty"`
 
-	// SendBatchHardLimit is the maximum size of a batch. If exceeded, the batch will be split. If 0, then no limit is applied
+	// SendBatchMaxSize is the maximum size of a batch. Larger batches are split into smaller units.
+	// Default value is 0, that means no maximum size.
+	SendBatchMaxSize uint32 `mapstructure:"send_batch_max_size,omitempty"`
+
+	// SendBatchHardLimit - deprecated - is the maximum size of a batch. If exceeded, the batch will be split. If 0, then no limit is applied
 	SendBatchHardLimit uint32 `mapstructure:"send_batch_hard_limit,omitempty"`
 }

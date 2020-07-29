@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build linux windows
+
 package processscraper
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"strings"
 	"testing"
@@ -34,7 +37,11 @@ import (
 )
 
 func TestScrapeMetrics(t *testing.T) {
+	const bootTime = 100
+	const expectedStartTime = 100 * 1e9
+
 	scraper, err := newProcessScraper(&Config{})
+	scraper.bootTime = func() (uint64, error) { return bootTime, nil }
 	require.NoError(t, err, "Failed to create process scraper: %v", err)
 	err = scraper.Initialize(context.Background())
 	require.NoError(t, err, "Failed to initialize process scraper: %v", err)
@@ -57,9 +64,9 @@ func TestScrapeMetrics(t *testing.T) {
 
 	require.Greater(t, resourceMetrics.Len(), 1)
 	assertResourceAttributes(t, resourceMetrics)
-	assertCPUUsageMetricValid(t, resourceMetrics)
+	assertCPUTimeMetricValid(t, resourceMetrics, expectedStartTime)
 	assertMemoryUsageMetricValid(t, resourceMetrics)
-	assertDiskBytesMetricValid(t, resourceMetrics)
+	assertDiskIOMetricValid(t, resourceMetrics, expectedStartTime)
 }
 
 func assertResourceAttributes(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice) {
@@ -74,26 +81,32 @@ func assertResourceAttributes(t *testing.T, resourceMetrics pdata.ResourceMetric
 	}
 }
 
-func assertCPUUsageMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice) {
-	cpuUsageMetric := getMetric(t, metricCPUUsageDescriptor, resourceMetrics)
-	internal.AssertDescriptorEqual(t, metricCPUUsageDescriptor, cpuUsageMetric.MetricDescriptor())
-	internal.AssertDoubleMetricLabelHasValue(t, cpuUsageMetric, 0, stateLabelName, userStateLabelValue)
-	internal.AssertDoubleMetricLabelHasValue(t, cpuUsageMetric, 1, stateLabelName, systemStateLabelValue)
+func assertCPUTimeMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice, startTime pdata.TimestampUnixNano) {
+	cpuTimeMetric := getMetric(t, cpuTimeDescriptor, resourceMetrics)
+	internal.AssertDescriptorEqual(t, cpuTimeDescriptor, cpuTimeMetric.MetricDescriptor())
+	if startTime != 0 {
+		internal.AssertDoubleMetricStartTimeEquals(t, cpuTimeMetric, startTime)
+	}
+	internal.AssertDoubleMetricLabelHasValue(t, cpuTimeMetric, 0, stateLabelName, userStateLabelValue)
+	internal.AssertDoubleMetricLabelHasValue(t, cpuTimeMetric, 1, stateLabelName, systemStateLabelValue)
 	if runtime.GOOS == "linux" {
-		internal.AssertDoubleMetricLabelHasValue(t, cpuUsageMetric, 2, stateLabelName, waitStateLabelValue)
+		internal.AssertDoubleMetricLabelHasValue(t, cpuTimeMetric, 2, stateLabelName, waitStateLabelValue)
 	}
 }
 
 func assertMemoryUsageMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice) {
-	memoryUsageMetric := getMetric(t, metricMemoryUsageDescriptor, resourceMetrics)
-	internal.AssertDescriptorEqual(t, metricMemoryUsageDescriptor, memoryUsageMetric.MetricDescriptor())
+	memoryUsageMetric := getMetric(t, memoryUsageDescriptor, resourceMetrics)
+	internal.AssertDescriptorEqual(t, memoryUsageDescriptor, memoryUsageMetric.MetricDescriptor())
 }
 
-func assertDiskBytesMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice) {
-	diskBytesMetric := getMetric(t, metricDiskBytesDescriptor, resourceMetrics)
-	internal.AssertDescriptorEqual(t, metricDiskBytesDescriptor, diskBytesMetric.MetricDescriptor())
-	internal.AssertInt64MetricLabelHasValue(t, diskBytesMetric, 0, directionLabelName, readDirectionLabelValue)
-	internal.AssertInt64MetricLabelHasValue(t, diskBytesMetric, 1, directionLabelName, writeDirectionLabelValue)
+func assertDiskIOMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice, startTime pdata.TimestampUnixNano) {
+	diskIOMetric := getMetric(t, diskIODescriptor, resourceMetrics)
+	internal.AssertDescriptorEqual(t, diskIODescriptor, diskIOMetric.MetricDescriptor())
+	if startTime != 0 {
+		internal.AssertInt64MetricStartTimeEquals(t, diskIOMetric, startTime)
+	}
+	internal.AssertInt64MetricLabelHasValue(t, diskIOMetric, 0, directionLabelName, readDirectionLabelValue)
+	internal.AssertInt64MetricLabelHasValue(t, diskIOMetric, 1, directionLabelName, writeDirectionLabelValue)
 }
 
 func getMetric(t *testing.T, descriptor pdata.MetricDescriptor, rms pdata.ResourceMetricsSlice) pdata.Metric {
@@ -107,7 +120,7 @@ func getMetric(t *testing.T, descriptor pdata.MetricDescriptor, rms pdata.Resour
 		}
 	}
 
-	require.Failf(t, "no metric with name %s was returned", descriptor.Name())
+	require.Fail(t, fmt.Sprintf("no metric with name %s was returned", descriptor.Name()))
 	return pdata.NewMetric()
 }
 

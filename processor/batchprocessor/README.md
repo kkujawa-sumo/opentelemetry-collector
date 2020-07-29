@@ -17,10 +17,12 @@ Please refer to [config.go](./config.go) for the config spec.
 The following configuration options can be modified:
 - `send_batch_size` (default = 8192): Number of spans or metrics after which a
 batch will be sent.
-- `send_batch_hard_limit` (default = 0 - no limit): Maximum number of spans in a batch. 
-If more spans are present, batch will be split into smaller ones. 0 means no limit.
 - `timeout` (default = 200ms): Time duration after which a batch will be sent
 regardless of size.
+- `send_batch_max_size` (default = 0): The maximum number of items in a batch.
+ This property ensures that larger batches are split into smaller units. 
+ By default (`0`), there is no upper limit of the batch size. 
+ It is currently supported only for the trace pipeline.
 
 Examples:
 

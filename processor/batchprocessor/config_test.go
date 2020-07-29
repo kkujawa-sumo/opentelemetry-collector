@@ -30,8 +30,8 @@ func TestLoadConfig(t *testing.T) {
 	factories, err := config.ExampleComponents()
 	assert.NoError(t, err)
 
-	factory := &Factory{}
-	factories.Processors[typeStr] = &Factory{}
+	factory := NewFactory()
+	factories.Processors[typeStr] = factory
 	cfg, err := config.LoadConfigFile(t, path.Join(".", "testdata", "config.yaml"), factories)
 
 	require.Nil(t, err)
@@ -44,7 +44,7 @@ func TestLoadConfig(t *testing.T) {
 
 	timeout := time.Second * 10
 	sendBatchSize := uint32(10000)
-	sendBatchHardLimit := uint32(30000)
+	sendBatchMaxSize := uint32(11000)
 
 	assert.Equal(t, p1,
 		&Config{
@@ -52,8 +52,8 @@ func TestLoadConfig(t *testing.T) {
 				TypeVal: "batch",
 				NameVal: "batch/2",
 			},
-			SendBatchSize:      sendBatchSize,
-			SendBatchHardLimit: sendBatchHardLimit,
-			Timeout:            timeout,
+			SendBatchSize:    sendBatchSize,
+			SendBatchMaxSize: sendBatchMaxSize,
+			Timeout:          timeout,
 		})
 }

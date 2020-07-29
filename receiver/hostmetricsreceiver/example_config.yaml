@@ -12,7 +12,8 @@ receivers:
       disk:
       filesystem:
       network:
-      virtualmemory:
+      processes:
+      swap:
 
 exporters:
   logging:

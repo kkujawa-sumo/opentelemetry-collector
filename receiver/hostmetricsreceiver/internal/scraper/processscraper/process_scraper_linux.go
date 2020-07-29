@@ -24,8 +24,38 @@ import (
 
 const cpuStatesLen = 3
 
-func appendCPUStateTimes(ddps pdata.DoubleDataPointSlice, startTime pdata.TimestampUnixNano, cpuTime *cpu.TimesStat) {
-	initializeCPUUsageDataPoint(ddps.At(0), startTime, cpuTime.User, userStateLabelValue)
-	initializeCPUUsageDataPoint(ddps.At(1), startTime, cpuTime.System, systemStateLabelValue)
-	initializeCPUUsageDataPoint(ddps.At(2), startTime, cpuTime.Iowait, waitStateLabelValue)
+func appendCPUTimeStateDataPoints(ddps pdata.DoubleDataPointSlice, startTime pdata.TimestampUnixNano, cpuTime *cpu.TimesStat) {
+	initializeCPUTimeDataPoint(ddps.At(0), startTime, cpuTime.User, userStateLabelValue)
+	initializeCPUTimeDataPoint(ddps.At(1), startTime, cpuTime.System, systemStateLabelValue)
+	initializeCPUTimeDataPoint(ddps.At(2), startTime, cpuTime.Iowait, waitStateLabelValue)
+}
+
+func getProcessExecutable(proc processHandle) (*executableMetadata, error) {
+	name, err := proc.Name()
+	if err != nil {
+		return nil, err
+	}
+
+	exe, err := proc.Exe()
+	if err != nil {
+		return nil, err
+	}
+
+	executable := &executableMetadata{name: name, path: exe}
+	return executable, nil
+}
+
+func getProcessCommand(proc processHandle) (*commandMetadata, error) {
+	cmdline, err := proc.CmdlineSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	var cmd string
+	if len(cmdline) > 0 {
+		cmd = cmdline[0]
+	}
+
+	command := &commandMetadata{command: cmd, commandLineSlice: cmdline}
+	return command, nil
 }
