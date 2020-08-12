@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build linux windows
-
 package processscraper
 
 import (
@@ -36,7 +34,15 @@ import (
 	"go.opentelemetry.io/collector/translator/conventions"
 )
 
+func skipTestOnUnsupportedOS(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+		t.Skipf("skipping test on %v", runtime.GOOS)
+	}
+}
+
 func TestScrapeMetrics(t *testing.T) {
+	skipTestOnUnsupportedOS(t)
+
 	const bootTime = 100
 	const expectedStartTime = 100 * 1e9
 
@@ -65,7 +71,8 @@ func TestScrapeMetrics(t *testing.T) {
 	require.Greater(t, resourceMetrics.Len(), 1)
 	assertResourceAttributes(t, resourceMetrics)
 	assertCPUTimeMetricValid(t, resourceMetrics, expectedStartTime)
-	assertMemoryUsageMetricValid(t, resourceMetrics)
+	assertMemoryUsageMetricValid(t, physicalMemoryUsageDescriptor, resourceMetrics)
+	assertMemoryUsageMetricValid(t, virtualMemoryUsageDescriptor, resourceMetrics)
 	assertDiskIOMetricValid(t, resourceMetrics, expectedStartTime)
 }
 
@@ -77,7 +84,7 @@ func assertResourceAttributes(t *testing.T, resourceMetrics pdata.ResourceMetric
 		internal.AssertContainsAttribute(t, attr, conventions.AttributeProcessExecutablePath)
 		internal.AssertContainsAttribute(t, attr, conventions.AttributeProcessCommand)
 		internal.AssertContainsAttribute(t, attr, conventions.AttributeProcessCommandLine)
-		internal.AssertContainsAttribute(t, attr, conventions.AttributeProcessUsername)
+		internal.AssertContainsAttribute(t, attr, conventions.AttributeProcessOwner)
 	}
 }
 
@@ -94,9 +101,9 @@ func assertCPUTimeMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetric
 	}
 }
 
-func assertMemoryUsageMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice) {
-	memoryUsageMetric := getMetric(t, memoryUsageDescriptor, resourceMetrics)
-	internal.AssertDescriptorEqual(t, memoryUsageDescriptor, memoryUsageMetric.MetricDescriptor())
+func assertMemoryUsageMetricValid(t *testing.T, descriptor pdata.MetricDescriptor, resourceMetrics pdata.ResourceMetricsSlice) {
+	memoryUsageMetric := getMetric(t, descriptor, resourceMetrics)
+	internal.AssertDescriptorEqual(t, descriptor, memoryUsageMetric.MetricDescriptor())
 }
 
 func assertDiskIOMetricValid(t *testing.T, resourceMetrics pdata.ResourceMetricsSlice, startTime pdata.TimestampUnixNano) {
@@ -131,6 +138,8 @@ func getMetricSlice(t *testing.T, rm pdata.ResourceMetrics) pdata.MetricSlice {
 }
 
 func TestScrapeMetrics_NewError(t *testing.T) {
+	skipTestOnUnsupportedOS(t)
+
 	_, err := newProcessScraper(&Config{Include: MatchConfig{Names: []string{"test"}}})
 	require.Error(t, err)
 	require.Regexp(t, "^error creating process include filters:", err.Error())
@@ -141,6 +150,8 @@ func TestScrapeMetrics_NewError(t *testing.T) {
 }
 
 func TestScrapeMetrics_GetProcessesError(t *testing.T) {
+	skipTestOnUnsupportedOS(t)
+
 	scraper, err := newProcessScraper(&Config{})
 	require.NoError(t, err, "Failed to create process scraper: %v", err)
 
@@ -227,6 +238,8 @@ func newDefaultHandleMock() *processHandleMock {
 }
 
 func TestScrapeMetrics_Filtered(t *testing.T) {
+	skipTestOnUnsupportedOS(t)
+
 	type testCase struct {
 		name          string
 		names         []string
@@ -318,6 +331,8 @@ func TestScrapeMetrics_Filtered(t *testing.T) {
 }
 
 func TestScrapeMetrics_ProcessErrors(t *testing.T) {
+	skipTestOnUnsupportedOS(t)
+
 	type testCase struct {
 		name            string
 		osFilter        string
@@ -429,12 +444,16 @@ func TestScrapeMetrics_ProcessErrors(t *testing.T) {
 	}
 }
 
-func getExpectedLengthOfReturnedMetrics(expectedErrors ...error) int {
+func getExpectedLengthOfReturnedMetrics(timeError, memError, diskError error) int {
 	expectedLen := 0
-	for _, expectedErr := range expectedErrors {
-		if expectedErr == nil {
-			expectedLen++
-		}
+	if timeError == nil {
+		expectedLen++
+	}
+	if memError == nil {
+		expectedLen += 2
+	}
+	if diskError == nil {
+		expectedLen++
 	}
 	return expectedLen
 }

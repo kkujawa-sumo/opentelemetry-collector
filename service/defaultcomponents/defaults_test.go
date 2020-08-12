@@ -30,6 +30,7 @@ func TestDefaultComponents(t *testing.T) {
 		"health_check",
 		"pprof",
 		"zpages",
+		"fluentbit",
 	}
 	expectedReceivers := []configmodels.Type{
 		"jaeger",
@@ -38,6 +39,7 @@ func TestDefaultComponents(t *testing.T) {
 		"opencensus",
 		"otlp",
 		"hostmetrics",
+		"fluentforward",
 	}
 	expectedProcessors := []configmodels.Type{
 		"attributes",
@@ -49,6 +51,7 @@ func TestDefaultComponents(t *testing.T) {
 		"probabilistic_sampler",
 		"span",
 		"filter",
+		"groupbytrace",
 	}
 	expectedExporters := []configmodels.Type{
 		"opencensus",
@@ -58,6 +61,7 @@ func TestDefaultComponents(t *testing.T) {
 		"jaeger",
 		"file",
 		"otlp",
+		"kafka",
 	}
 
 	factories, err := Components()

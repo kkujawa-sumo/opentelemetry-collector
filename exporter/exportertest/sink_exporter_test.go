@@ -27,7 +27,6 @@ import (
 	"go.opentelemetry.io/collector/consumer/consumerdata"
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/consumer/pdatautil"
-	"go.opentelemetry.io/collector/internal/data"
 	"go.opentelemetry.io/collector/internal/data/testdata"
 )
 
@@ -135,22 +134,26 @@ func TestSinkMetricsExporter_Error(t *testing.T) {
 	require.NoError(t, sink.Shutdown(context.Background()))
 }
 
-func TestSinkLogExporter(t *testing.T) {
-	sink := new(SinkLogExporter)
+func TestSinkLogsExporter(t *testing.T) {
+	sink := new(SinkLogsExporter)
 	require.NoError(t, sink.Start(context.Background(), componenttest.NewNopHost()))
 	md := testdata.GenerateLogDataOneLogNoResource()
-	want := make([]data.Logs, 0, 7)
+	want := make([]pdata.Logs, 0, 7)
 	for i := 0; i < 7; i++ {
 		require.NoError(t, sink.ConsumeLogs(context.Background(), md))
 		want = append(want, md)
 	}
 	assert.Equal(t, want, sink.AllLogs())
 	assert.Equal(t, len(want), sink.LogRecordsCount())
+
+	sink.Reset()
+	assert.Equal(t, 0, len(sink.AllLogs()))
+
 	require.NoError(t, sink.Shutdown(context.Background()))
 }
 
-func TestSinkLogExporter_Error(t *testing.T) {
-	sink := new(SinkLogExporter)
+func TestSinkLogsExporter_Error(t *testing.T) {
+	sink := new(SinkLogsExporter)
 	require.NoError(t, sink.Start(context.Background(), componenttest.NewNopHost()))
 	sink.SetConsumeLogError(errors.New("my error"))
 	ld := testdata.GenerateLogDataOneLogNoResource()

@@ -17,6 +17,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -51,43 +52,57 @@ var (
 )
 
 type metricBuilder struct {
-	hasData            bool
-	hasInternalMetric  bool
-	mc                 MetadataCache
-	metrics            []*metricspb.Metric
-	numTimeseries      int
-	droppedTimeseries  int
-	useStartTimeMetric bool
-	startTime          float64
-	scrapeLatencyMs    float64
-	scrapeStatus       string
-	logger             *zap.Logger
-	currentMf          MetricFamily
+	hasData              bool
+	hasInternalMetric    bool
+	mc                   MetadataCache
+	metrics              []*metricspb.Metric
+	numTimeseries        int
+	droppedTimeseries    int
+	useStartTimeMetric   bool
+	startTimeMetricRegex *regexp.Regexp
+	startTime            float64
+	scrapeLatencyMs      float64
+	scrapeStatus         string
+	logger               *zap.Logger
+	currentMf            MetricFamily
 }
 
 // newMetricBuilder creates a MetricBuilder which is allowed to feed all the datapoints from a single prometheus
 // scraped page by calling its AddDataPoint function, and turn them into an opencensus data.MetricsData object
 // by calling its Build function
-func newMetricBuilder(mc MetadataCache, useStartTimeMetric bool, logger *zap.Logger) *metricBuilder {
-
-	return &metricBuilder{
-		mc:                 mc,
-		metrics:            make([]*metricspb.Metric, 0),
-		logger:             logger,
-		numTimeseries:      0,
-		droppedTimeseries:  0,
-		useStartTimeMetric: useStartTimeMetric,
+func newMetricBuilder(mc MetadataCache, useStartTimeMetric bool, startTimeMetricRegex string, logger *zap.Logger) *metricBuilder {
+	var regex *regexp.Regexp
+	if startTimeMetricRegex != "" {
+		regex, _ = regexp.Compile(startTimeMetricRegex)
 	}
+	return &metricBuilder{
+		mc:                   mc,
+		metrics:              make([]*metricspb.Metric, 0),
+		logger:               logger,
+		numTimeseries:        0,
+		droppedTimeseries:    0,
+		useStartTimeMetric:   useStartTimeMetric,
+		startTimeMetricRegex: regex,
+	}
+}
+
+func (b *metricBuilder) matchStartTimeMetric(metricName string) bool {
+	if b.startTimeMetricRegex != nil {
+		return b.startTimeMetricRegex.MatchString(metricName)
+	}
+
+	return metricName == startTimeMetricName
 }
 
 // AddDataPoint is for feeding prometheus data complexValue in its processing order
 func (b *metricBuilder) AddDataPoint(ls labels.Labels, t int64, v float64) error {
 	metricName := ls.Get(model.MetricNameLabel)
-	if metricName == "" {
+	switch {
+	case metricName == "":
 		b.numTimeseries++
 		b.droppedTimeseries++
 		return errMetricNameNotFound
-	} else if isInternalMetric(metricName) {
+	case isInternalMetric(metricName):
 		b.hasInternalMetric = true
 		lm := ls.Map()
 		delete(lm, model.MetricNameLabel)
@@ -103,7 +118,7 @@ func (b *metricBuilder) AddDataPoint(ls labels.Labels, t int64, v float64) error
 			b.scrapeLatencyMs = v * 1000
 		}
 		return nil
-	} else if b.useStartTimeMetric && metricName == startTimeMetricName {
+	case b.useStartTimeMetric && b.matchStartTimeMetric(metricName):
 		b.startTime = v
 	}
 
@@ -192,12 +207,13 @@ func normalizeMetricName(name string) string {
 
 func getBoundary(metricType metricspb.MetricDescriptor_Type, labels labels.Labels) (float64, error) {
 	labelName := ""
-	if metricType == metricspb.MetricDescriptor_CUMULATIVE_DISTRIBUTION ||
-		metricType == metricspb.MetricDescriptor_GAUGE_DISTRIBUTION {
+	switch metricType {
+	case metricspb.MetricDescriptor_CUMULATIVE_DISTRIBUTION,
+		metricspb.MetricDescriptor_GAUGE_DISTRIBUTION:
 		labelName = model.BucketLabel
-	} else if metricType == metricspb.MetricDescriptor_SUMMARY {
+	case metricspb.MetricDescriptor_SUMMARY:
 		labelName = model.QuantileLabel
-	} else {
+	default:
 		return 0, errNoBoundaryLabel
 	}
 

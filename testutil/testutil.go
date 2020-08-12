@@ -15,9 +15,11 @@
 package testutil
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -137,7 +139,7 @@ func WaitFor(t *testing.T, cond func() bool, errMsg ...interface{}) bool {
 
 		// Increase waiting interval exponentially up to 500 ms.
 		if waitInterval < time.Millisecond*500 {
-			waitInterval = waitInterval * 2
+			waitInterval *= 2
 		}
 
 		if cond() {
@@ -150,4 +152,24 @@ func WaitFor(t *testing.T, cond func() bool, errMsg ...interface{}) bool {
 			return false
 		}
 	}
+}
+
+// LimitedWriter is an io.Writer that will return an EOF error after MaxLen has
+// been reached.  If MaxLen is 0, Writes will always succeed.
+type LimitedWriter struct {
+	bytes.Buffer
+	MaxLen int
+}
+
+var _ io.Writer = new(LimitedWriter)
+
+func (lw *LimitedWriter) Write(p []byte) (n int, err error) {
+	if lw.MaxLen != 0 && len(p)+lw.Len() > lw.MaxLen {
+		return 0, io.EOF
+	}
+	return lw.Buffer.Write(p)
+}
+
+func (lw *LimitedWriter) Close() error {
+	return nil
 }

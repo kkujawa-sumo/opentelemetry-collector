@@ -16,8 +16,10 @@ package processorhelper
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
 	"go.opentelemetry.io/collector/component"
@@ -38,13 +40,15 @@ func TestNewTrace(t *testing.T) {
 		defaultConfig)
 	assert.EqualValues(t, typeStr, factory.Type())
 	assert.EqualValues(t, defaultCfg, factory.CreateDefaultConfig())
+	_, ok := factory.(component.ConfigUnmarshaler)
+	assert.False(t, ok)
 	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
 	assert.Error(t, err)
 	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
 	assert.Error(t, err)
 
-	lfactory := factory.(component.LogProcessorFactory)
-	_, err = lfactory.CreateLogProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
+	lfactory := factory.(component.LogsProcessorFactory)
+	_, err = lfactory.CreateLogsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.Error(t, err)
 }
 
@@ -54,9 +58,14 @@ func TestNewMetrics_WithConstructors(t *testing.T) {
 		defaultConfig,
 		WithTraces(createTraceProcessor),
 		WithMetrics(createMetricsProcessor),
-		WithLogs(createLogProcessor))
+		WithLogs(createLogsProcessor),
+		WithCustomUnmarshaler(customUnmarshaler))
 	assert.EqualValues(t, typeStr, factory.Type())
 	assert.EqualValues(t, defaultCfg, factory.CreateDefaultConfig())
+
+	fu, ok := factory.(component.ConfigUnmarshaler)
+	assert.True(t, ok)
+	assert.Equal(t, errors.New("my error"), fu.Unmarshal(nil, nil))
 
 	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
 	assert.NoError(t, err)
@@ -64,8 +73,8 @@ func TestNewMetrics_WithConstructors(t *testing.T) {
 	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
 	assert.NoError(t, err)
 
-	lfactory := factory.(component.LogProcessorFactory)
-	_, err = lfactory.CreateLogProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
+	lfactory := factory.(component.LogsProcessorFactory)
+	_, err = lfactory.CreateLogsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.NoError(t, err)
 }
 
@@ -81,6 +90,10 @@ func createMetricsProcessor(context.Context, component.ProcessorCreateParams, co
 	return nil, nil
 }
 
-func createLogProcessor(context.Context, component.ProcessorCreateParams, configmodels.Processor, consumer.LogConsumer) (component.LogProcessor, error) {
+func createLogsProcessor(context.Context, component.ProcessorCreateParams, configmodels.Processor, consumer.LogsConsumer) (component.LogsProcessor, error) {
 	return nil, nil
+}
+
+func customUnmarshaler(*viper.Viper, interface{}) error {
+	return errors.New("my error")
 }

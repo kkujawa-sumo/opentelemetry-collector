@@ -47,6 +47,7 @@ var standardMetrics = []string{
 	"system.memory.usage",
 	"system.disk.io",
 	"system.disk.ops",
+	"system.disk.pending_operations",
 	"system.disk.time",
 	"system.filesystem.usage",
 	"system.cpu.load_average.1m",
@@ -63,7 +64,8 @@ var standardMetrics = []string{
 
 var resourceMetrics = []string{
 	"process.cpu.time",
-	"process.memory.usage",
+	"process.memory.physical_usage",
+	"process.memory.virtual_usage",
 	"process.disk.io",
 }
 
@@ -124,7 +126,7 @@ func TestGatherMetrics_EndToEnd(t *testing.T) {
 	cancelFn()
 
 	const tick = 50 * time.Millisecond
-	const waitFor = time.Second
+	const waitFor = 5 * time.Second
 	require.Eventuallyf(t, func() bool {
 		got := sink.AllMetrics()
 		if len(got) == 0 {

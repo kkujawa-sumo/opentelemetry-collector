@@ -42,7 +42,7 @@ func NewRateLimiting(logger *zap.Logger, spansPerSecond int64) PolicyEvaluator {
 // after the sampling decision was already taken for the trace.
 // This gives the evaluator a chance to log any message/metrics and/or update any
 // related internal state.
-func (r *rateLimiting) OnLateArrivingSpans(earlyDecision Decision, spans []*tracepb.Span) error {
+func (r *rateLimiting) OnLateArrivingSpans(Decision, []*tracepb.Span) error {
 	r.logger.Debug("Triggering action for late arriving spans in rate-limiting filter")
 	return nil
 }
@@ -53,7 +53,7 @@ func (r *rateLimiting) EvaluateSecondChance(traceID []byte, trace *TraceData) (D
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (r *rateLimiting) Evaluate(traceID []byte, trace *TraceData) (Decision, error) {
+func (r *rateLimiting) Evaluate(_ []byte, trace *TraceData) (Decision, error) {
 	r.logger.Debug("Evaluating spans in rate-limiting filter")
 	currSecond := time.Now().Unix()
 	if r.currentSecond != currSecond {
@@ -72,7 +72,7 @@ func (r *rateLimiting) Evaluate(traceID []byte, trace *TraceData) (Decision, err
 
 // OnDroppedSpans is called when the trace needs to be dropped, due to memory
 // pressure, before the decision_wait time has been reached.
-func (r *rateLimiting) OnDroppedSpans(traceID []byte, trace *TraceData) (Decision, error) {
+func (r *rateLimiting) OnDroppedSpans([]byte, *TraceData) (Decision, error) {
 	r.logger.Debug("Triggering action for dropped spans in rate-limiting filter")
 	return Sampled, nil
 }

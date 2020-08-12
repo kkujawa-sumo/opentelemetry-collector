@@ -16,6 +16,7 @@ package receiverhelper
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -39,10 +40,14 @@ func TestNewFactory(t *testing.T) {
 		defaultConfig)
 	assert.EqualValues(t, typeStr, factory.Type())
 	assert.EqualValues(t, defaultCfg, factory.CreateDefaultConfig())
-	assert.Nil(t, factory.CustomUnmarshaler())
+	_, ok := factory.(component.ConfigUnmarshaler)
+	assert.False(t, ok)
 	_, err := factory.CreateTraceReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
 	assert.Error(t, err)
 	_, err = factory.CreateMetricsReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
+	assert.Error(t, err)
+	lfactory := factory.(component.LogsReceiverFactory)
+	_, err = lfactory.CreateLogsReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
 	assert.Error(t, err)
 }
 
@@ -52,16 +57,24 @@ func TestNewFactory_WithConstructors(t *testing.T) {
 		defaultConfig,
 		WithTraces(createTraceReceiver),
 		WithMetrics(createMetricsReceiver),
+		WithLogs(createLogsReceiver),
 		WithCustomUnmarshaler(customUnmarshaler))
 	assert.EqualValues(t, typeStr, factory.Type())
 	assert.EqualValues(t, defaultCfg, factory.CreateDefaultConfig())
-	assert.NotNil(t, factory.CustomUnmarshaler())
-	tr, err := factory.CreateTraceReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
+
+	fu, ok := factory.(component.ConfigUnmarshaler)
+	assert.True(t, ok)
+	assert.Equal(t, errors.New("my error"), fu.Unmarshal(nil, nil))
+
+	_, err := factory.CreateTraceReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
 	assert.NoError(t, err)
-	assert.EqualValues(t, component.TraceReceiver(nil), tr)
-	mr, err := factory.CreateMetricsReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
+
+	_, err = factory.CreateMetricsReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
 	assert.NoError(t, err)
-	assert.EqualValues(t, component.MetricsReceiver(nil), mr)
+
+	lfactory := factory.(component.LogsReceiverFactory)
+	_, err = lfactory.CreateLogsReceiver(context.Background(), component.ReceiverCreateParams{}, defaultCfg, nil)
+	assert.NoError(t, err)
 }
 
 func defaultConfig() configmodels.Receiver {
@@ -76,6 +89,10 @@ func createMetricsReceiver(context.Context, component.ReceiverCreateParams, conf
 	return nil, nil
 }
 
+func createLogsReceiver(context.Context, component.ReceiverCreateParams, configmodels.Receiver, consumer.LogsConsumer) (component.LogsReceiver, error) {
+	return nil, nil
+}
+
 func customUnmarshaler(*viper.Viper, interface{}) error {
-	return nil
+	return errors.New("my error")
 }

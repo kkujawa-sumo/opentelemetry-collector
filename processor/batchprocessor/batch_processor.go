@@ -27,6 +27,7 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/consumer/pdatautil"
+	"go.opentelemetry.io/collector/internal/collector/telemetry"
 	"go.opentelemetry.io/collector/internal/data"
 	"go.opentelemetry.io/collector/processor"
 )
@@ -40,8 +41,9 @@ import (
 // - batch size reaches cfg.SendBatchSize
 // - cfg.Timeout is elapsed since the timestamp when the previous batch was sent out.
 type batchProcessor struct {
-	name   string
-	logger *zap.Logger
+	name           string
+	logger         *zap.Logger
+	telemetryLevel telemetry.Level
 
 	sendBatchSize    uint32
 	timeout          time.Duration
@@ -60,6 +62,9 @@ type batch interface {
 	// itemCount returns the size of the current batch
 	itemCount() uint32
 
+	// size returns the size in bytes of the current batch
+	size() int
+
 	// reset the current batch structure with zero/empty values.
 	reset()
 
@@ -70,7 +75,7 @@ type batch interface {
 var _ consumer.TraceConsumer = (*batchProcessor)(nil)
 var _ consumer.MetricsConsumer = (*batchProcessor)(nil)
 
-func newBatchProcessor(params component.ProcessorCreateParams, cfg *Config, batch batch) *batchProcessor {
+func newBatchProcessor(params component.ProcessorCreateParams, cfg *Config, batch batch, telemetryLevel telemetry.Level) *batchProcessor {
 	var maxSize uint32
 	if cfg.SendBatchHardLimit > 0 {
 		maxSize = cfg.SendBatchHardLimit
@@ -79,8 +84,9 @@ func newBatchProcessor(params component.ProcessorCreateParams, cfg *Config, batc
 	}
 
 	return &batchProcessor{
-		name:   cfg.Name(),
-		logger: params.Logger,
+		name:           cfg.Name(),
+		logger:         params.Logger,
+		telemetryLevel: telemetryLevel,
 
 		sendBatchSize:    cfg.SendBatchSize,
 		sendBatchMaxSize: maxSize,
@@ -160,6 +166,10 @@ func (bp *batchProcessor) sendItems(measure *stats.Int64Measure) {
 	statsTags := []tag.Mutator{tag.Insert(processor.TagProcessorNameKey, bp.name)}
 	_ = stats.RecordWithTags(context.Background(), statsTags, measure.M(1), statBatchSendSize.M(int64(bp.batch.itemCount())))
 
+	if bp.telemetryLevel == telemetry.Detailed {
+		_ = stats.RecordWithTags(context.Background(), statsTags, statBatchSendSizeBytes.M(int64(bp.batch.size())))
+	}
+
 	if err := bp.batch.export(context.Background()); err != nil {
 		bp.logger.Warn("Sender failed", zap.Error(err))
 	}
@@ -180,13 +190,13 @@ func (bp *batchProcessor) ConsumeMetrics(_ context.Context, md pdata.Metrics) er
 }
 
 // newBatchTracesProcessor creates a new batch processor that batches traces by size or with timeout
-func newBatchTracesProcessor(params component.ProcessorCreateParams, trace consumer.TraceConsumer, cfg *Config) *batchProcessor {
-	return newBatchProcessor(params, cfg, newBatchTraces(trace))
+func newBatchTracesProcessor(params component.ProcessorCreateParams, trace consumer.TraceConsumer, cfg *Config, telemetryLevel telemetry.Level) *batchProcessor {
+	return newBatchProcessor(params, cfg, newBatchTraces(trace), telemetryLevel)
 }
 
 // newBatchMetricsProcessor creates a new batch processor that batches metrics by size or with timeout
-func newBatchMetricsProcessor(params component.ProcessorCreateParams, metrics consumer.MetricsConsumer, cfg *Config) *batchProcessor {
-	return newBatchProcessor(params, cfg, newBatchMetrics(metrics))
+func newBatchMetricsProcessor(params component.ProcessorCreateParams, metrics consumer.MetricsConsumer, cfg *Config, telemetryLevel telemetry.Level) *batchProcessor {
+	return newBatchProcessor(params, cfg, newBatchMetrics(metrics), telemetryLevel)
 }
 
 type batchTraces struct {
@@ -221,6 +231,10 @@ func (bt *batchTraces) itemCount() uint32 {
 	return bt.spanCount
 }
 
+func (bt *batchTraces) size() int {
+	return bt.traceData.Size()
+}
+
 // resets the current batchTraces structure with zero values
 func (bt *batchTraces) reset() {
 	bt.traceData = pdata.NewTraces()
@@ -245,6 +259,10 @@ func (bm *batchMetrics) export(ctx context.Context) error {
 
 func (bm *batchMetrics) itemCount() uint32 {
 	return bm.metricCount
+}
+
+func (bm *batchMetrics) size() int {
+	return bm.metricData.Size()
 }
 
 // resets the current batchMetrics structure with zero/empty values.

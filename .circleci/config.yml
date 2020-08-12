@@ -22,7 +22,7 @@ commands:
             dist/otel-collector_*amd64.deb
             dist/otel-collector-*x86_64.rpm
             dist/otel-collector_*arm64.deb
-            dist/opentelemetry-collector.msi
+            dist/otel-collector-*amd64.msi
     steps:
       - run:
           name: Check if files exist
@@ -208,6 +208,18 @@ workflows:
           filters:
             tags:
               only: /^v([0-9])+.([0-9])+.([0-9])+.*/
+  contrib-test:
+    jobs:
+      - setup-environment:
+          filters:
+            tags:
+              only: /^v([0-9])+.([0-9])+.([0-9])+.*/
+      - contribtest:
+          requires:
+            - setup-environment
+          filters:
+            tags:
+              only: /^v([0-9])+.([0-9])+.([0-9])+.*/
 
 jobs:
   setup-environment:
@@ -284,6 +296,19 @@ jobs:
       - save_module_cache
       - github_issue_generator
 
+  contribtest:
+    executor: golang
+    steps:
+      - attach_to_workspace
+      - run:
+          name: Contrib repo tests
+          command: |
+            contrib_path=/tmp/opentelemetry-collector-contrib
+            git clone https://github.com/open-telemetry/opentelemetry-collector-contrib.git $contrib_path
+            make CONTRIB_PATH=$contrib_path check-contrib
+
+      - save_module_cache
+
   gosec:
     executor: golang
     steps:
@@ -336,7 +361,6 @@ jobs:
           name: Prepare release artifacts
           command: |
             cp bin/* dist/
-            mv dist/opentelemetry-collector.msi dist/otel-collector.msi
       - run:
           name: Calculate checksums
           command: cd dist && shasum -a 256 * > checksums.txt

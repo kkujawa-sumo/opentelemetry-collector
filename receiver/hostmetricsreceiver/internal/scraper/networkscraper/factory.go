@@ -42,9 +42,13 @@ func (f *Factory) CreateDefaultConfig() internal.Config {
 // CreateMetricsScraper creates a scraper based on provided config.
 func (f *Factory) CreateMetricsScraper(
 	ctx context.Context,
-	logger *zap.Logger,
+	_ *zap.Logger,
 	config internal.Config,
 ) (internal.Scraper, error) {
-	cfg := config.(*Config)
-	return obsreportscraper.WrapScraper(newNetworkScraper(ctx, cfg), TypeStr), nil
+	scraper, err := newNetworkScraper(ctx, config.(*Config))
+	if err != nil {
+		return nil, err
+	}
+
+	return obsreportscraper.WrapScraper(scraper, TypeStr), nil
 }

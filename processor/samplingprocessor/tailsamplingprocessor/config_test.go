@@ -22,24 +22,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.opentelemetry.io/collector/config"
+	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config/configmodels"
-	tsconfig "go.opentelemetry.io/collector/processor/samplingprocessor/tailsamplingprocessor/config"
+	"go.opentelemetry.io/collector/config/configtest"
 )
 
 func TestLoadConfig(t *testing.T) {
-	factories, err := config.ExampleComponents()
+	factories, err := componenttest.ExampleComponents()
 	assert.NoError(t, err)
 
 	factory := &Factory{}
 	factories.Processors[factory.Type()] = factory
 
-	cfg, err := config.LoadConfigFile(t, path.Join(".", "testdata", "tail_sampling_config.yaml"), factories)
+	cfg, err := configtest.LoadConfigFile(t, path.Join(".", "testdata", "tail_sampling_config.yaml"), factories)
 	require.Nil(t, err)
 	require.NotNil(t, cfg)
 
 	assert.Equal(t, cfg.Processors["tail_sampling"],
-		&tsconfig.Config{
+		&Config{
 			ProcessorSettings: configmodels.ProcessorSettings{
 				TypeVal: "tail_sampling",
 				NameVal: "tail_sampling",
@@ -47,41 +47,41 @@ func TestLoadConfig(t *testing.T) {
 			DecisionWait:            10 * time.Second,
 			NumTraces:               100,
 			ExpectedNewTracesPerSec: 10,
-			PolicyCfgs: []tsconfig.PolicyCfg{
+			PolicyCfgs: []PolicyCfg{
 				{
 					Name: "test-policy-1",
-					Type: tsconfig.AlwaysSample,
+					Type: AlwaysSample,
 				},
 				{
 					Name:                "test-policy-2",
-					Type:                tsconfig.NumericAttribute,
-					NumericAttributeCfg: tsconfig.NumericAttributeCfg{Key: "key1", MinValue: 50, MaxValue: 100},
+					Type:                NumericAttribute,
+					NumericAttributeCfg: NumericAttributeCfg{Key: "key1", MinValue: 50, MaxValue: 100},
 				},
 				{
 					Name:               "test-policy-3",
-					Type:               tsconfig.StringAttribute,
-					StringAttributeCfg: tsconfig.StringAttributeCfg{Key: "key2", Values: []string{"value1", "value2"}},
+					Type:               StringAttribute,
+					StringAttributeCfg: StringAttributeCfg{Key: "key2", Values: []string{"value1", "value2"}},
 				},
 				{
 					Name:            "test-policy-4",
-					Type:            tsconfig.RateLimiting,
-					RateLimitingCfg: tsconfig.RateLimitingCfg{SpansPerSecond: 35},
+					Type:            RateLimiting,
+					RateLimitingCfg: RateLimitingCfg{SpansPerSecond: 35},
 				},
 				{
 					Name: "test-policy-5",
-					Type: tsconfig.Cascading,
+					Type: Cascading,
 					SpansPerSecond: 1000,
-					Rules:     []tsconfig.CascadingRuleCfg{
+					Rules:     []CascadingRuleCfg{
 						{
 							Name: "num",
 							SpansPerSecond: 123,
-							NumericAttributeCfg: &tsconfig.NumericAttributeCfg{
+							NumericAttributeCfg: &NumericAttributeCfg{
 								Key: "key1", MinValue: 50, MaxValue: 100},
 						},
 						{
 							Name: "dur",
 							SpansPerSecond: 50,
-							DurationCfg: &tsconfig.DurationCfg{
+							DurationCfg: &DurationCfg{
 								MinDurationMicros: 9000000,
 							},
 						},
@@ -93,8 +93,8 @@ func TestLoadConfig(t *testing.T) {
 				},
 				{
 					Name:            "test-policy-6",
-					Type:            tsconfig.Duration,
-					DurationCfg: tsconfig.DurationCfg{
+					Type:            Duration,
+					DurationCfg: DurationCfg{
 						MinDurationMicros: 100000,
 					},
 				},

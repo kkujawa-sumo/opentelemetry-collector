@@ -17,7 +17,6 @@ package component
 import (
 	"context"
 
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	"go.opentelemetry.io/collector/config/configmodels"
@@ -49,10 +48,10 @@ type MetricsReceiver interface {
 	Receiver
 }
 
-// A LogReceiver is a "log data"-to-"internal format" converter.
+// A LogsReceiver is a "log data"-to-"internal format" converter.
 // Its purpose is to translate data from the wild into internal data format.
-// LogReceiver feeds a consumer.LogConsumer with data.
-type LogReceiver interface {
+// LogsReceiver feeds a consumer.LogsConsumer with data.
+type LogsReceiver interface {
 	Receiver
 }
 
@@ -68,20 +67,7 @@ type ReceiverFactoryBase interface {
 	// 'configcheck.ValidateConfig'. It is recommended to have such check in the
 	// tests of any implementation of the Factory interface.
 	CreateDefaultConfig() configmodels.Receiver
-
-	// CustomUnmarshaler returns a custom unmarshaler for the configuration or nil if
-	// there is no need for custom unmarshaling. This is typically used if viper.UnmarshalExact()
-	// is not sufficient to unmarshal correctly.
-	CustomUnmarshaler() CustomUnmarshaler
 }
-
-// CustomUnmarshaler is a function that un-marshals a viper data into a config struct
-// in a custom way.
-// componentViperSection *viper.Viper
-//   The config for this specific component. May be nil or empty if no config available.
-// intoCfg interface{}
-//   An empty interface wrapping a pointer to the config struct to unmarshal into.
-type CustomUnmarshaler func(componentViperSection *viper.Viper, intoCfg interface{}) error
 
 // ReceiverFactoryOld can create TraceReceiver and MetricsReceiver.
 type ReceiverFactoryOld interface {
@@ -125,17 +111,17 @@ type ReceiverFactory interface {
 		cfg configmodels.Receiver, nextConsumer consumer.MetricsConsumer) (MetricsReceiver, error)
 }
 
-// LogReceiverFactory can create a LogReceiver.
-type LogReceiverFactory interface {
+// LogsReceiverFactory can create a LogsReceiver.
+type LogsReceiverFactory interface {
 	ReceiverFactoryBase
 
-	// CreateLogReceiver creates a log receiver based on this config.
+	// CreateLogsReceiver creates a log receiver based on this config.
 	// If the receiver type does not support the data type or if the config is not valid
 	// error will be returned instead.
-	CreateLogReceiver(
+	CreateLogsReceiver(
 		ctx context.Context,
 		params ReceiverCreateParams,
 		cfg configmodels.Receiver,
-		nextConsumer consumer.LogConsumer,
-	) (LogReceiver, error)
+		nextConsumer consumer.LogsConsumer,
+	) (LogsReceiver, error)
 }
