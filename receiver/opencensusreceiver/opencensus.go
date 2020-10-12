@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,8 +52,8 @@ type ocReceiver struct {
 	traceReceiver   *octrace.Receiver
 	metricsReceiver *ocmetrics.Receiver
 
-	traceConsumer   consumer.TraceConsumerOld
-	metricsConsumer consumer.MetricsConsumerOld
+	traceConsumer   consumer.TraceConsumer
+	metricsConsumer consumer.MetricsConsumer
 
 	stopOnce                 sync.Once
 	startServerOnce          sync.Once
@@ -70,8 +70,8 @@ func newOpenCensusReceiver(
 	instanceName string,
 	transport string,
 	addr string,
-	tc consumer.TraceConsumerOld,
-	mc consumer.MetricsConsumerOld,
+	tc consumer.TraceConsumer,
+	mc consumer.MetricsConsumer,
 	opts ...ocOption,
 ) (*ocReceiver, error) {
 	// TODO: (@odeke-em) use options to enable address binding changes.

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,8 +24,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
-	"go.opentelemetry.io/collector/internal/data"
+	"go.opentelemetry.io/collector/internal"
 	otlplogs "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/logs/v1"
 	otlpmetrics "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/metrics/v1"
 	otlptrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/trace/v1"
@@ -50,14 +49,14 @@ func (e *fileExporter) ConsumeTraces(_ context.Context, td pdata.Traces) error {
 
 func (e *fileExporter) ConsumeMetrics(_ context.Context, md pdata.Metrics) error {
 	request := otlpmetrics.ExportMetricsServiceRequest{
-		ResourceMetrics: data.MetricDataToOtlp(pdatautil.MetricsToInternalMetrics(md)),
+		ResourceMetrics: pdata.MetricsToOtlp(md),
 	}
 	return exportMessageAsLine(e, &request)
 }
 
 func (e *fileExporter) ConsumeLogs(_ context.Context, ld pdata.Logs) error {
 	request := otlplogs.ExportLogsServiceRequest{
-		ResourceLogs: pdata.LogsToOtlp(ld),
+		ResourceLogs: internal.LogsToOtlp(ld.InternalRep()),
 	}
 	return exportMessageAsLine(e, &request)
 }

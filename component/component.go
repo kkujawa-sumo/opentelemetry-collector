@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,9 +29,19 @@ type Component interface {
 	// Start() then the collector startup will be aborted.
 	// If this is an exporter component it may prepare for exporting
 	// by connecting to the endpoint.
+	//
+	// If the component needs to perform a long-running starting operation then it is recommended
+	// that Start() returns quickly and the long-running operation is performed in background.
+	// In that case make sure that the long-running operation does not use the context passed
+	// to Start() function since that context will be cancelled soon and can abort the long-running operation.
+	// Create a new context from the context.Background() for long-running operations.
 	Start(ctx context.Context, host Host) error
 
 	// Shutdown is invoked during service shutdown.
+	//
+	// If there are any background operations running by the component they must be aborted as soon as possible.
+	// Remember that if you started any long-running background operation from the Start() method that operation
+	// must be also cancelled.
 	Shutdown(ctx context.Context) error
 }
 
@@ -107,3 +117,19 @@ type ConfigUnmarshaler interface {
 // intoCfg interface{}
 //   An empty interface wrapping a pointer to the config struct to unmarshal into.
 type CustomUnmarshaler func(componentViperSection *viper.Viper, intoCfg interface{}) error
+
+// ApplicationStartInfo is the information that is logged at the application start and
+// passed into each component. This information can be overridden in custom builds.
+type ApplicationStartInfo struct {
+	// Executable file name, e.g. "otelcol".
+	ExeName string
+
+	// Long name, used e.g. in the logs.
+	LongName string
+
+	// Version string.
+	Version string
+
+	// Git hash of the source code.
+	GitHash string
+}

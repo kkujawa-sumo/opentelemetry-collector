@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config/configgrpc"
 	"go.opentelemetry.io/collector/config/configmodels"
+	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/exporter/opencensusexporter"
 )
 
@@ -33,7 +34,7 @@ func TestExportersBuilder_Build(t *testing.T) {
 	factories, err := componenttest.ExampleComponents()
 	assert.NoError(t, err)
 
-	oceFactory := &opencensusexporter.Factory{}
+	oceFactory := opencensusexporter.NewFactory()
 	factories.Exporters[oceFactory.Type()] = oceFactory
 	cfg := &configmodels.Config{
 		Exporters: map[string]configmodels.Exporter{
@@ -45,6 +46,7 @@ func TestExportersBuilder_Build(t *testing.T) {
 				GRPCClientSettings: configgrpc.GRPCClientSettings{
 					Endpoint: "0.0.0.0:12345",
 				},
+				NumWorkers: 2,
 			},
 		},
 
@@ -59,7 +61,7 @@ func TestExportersBuilder_Build(t *testing.T) {
 		},
 	}
 
-	exporters, err := NewExportersBuilder(zap.NewNop(), cfg, factories.Exporters).Build()
+	exporters, err := NewExportersBuilder(zap.NewNop(), componenttest.TestApplicationStartInfo(), cfg, factories.Exporters).Build()
 
 	assert.NoError(t, err)
 	require.NotNil(t, exporters)
@@ -87,7 +89,7 @@ func TestExportersBuilder_Build(t *testing.T) {
 	// This should result in creating an exporter that has none of consumption
 	// functions set.
 	delete(cfg.Service.Pipelines, "trace")
-	exporters, err = NewExportersBuilder(zap.NewNop(), cfg, factories.Exporters).Build()
+	exporters, err = NewExportersBuilder(zap.NewNop(), componenttest.TestApplicationStartInfo(), cfg, factories.Exporters).Build()
 	assert.NotNil(t, exporters)
 	assert.NoError(t, err)
 
@@ -127,7 +129,7 @@ func TestExportersBuilder_BuildLogs(t *testing.T) {
 		},
 	}
 
-	exporters, err := NewExportersBuilder(zap.NewNop(), cfg, factories.Exporters).Build()
+	exporters, err := NewExportersBuilder(zap.NewNop(), componenttest.TestApplicationStartInfo(), cfg, factories.Exporters).Build()
 
 	assert.NoError(t, err)
 	require.NotNil(t, exporters)
@@ -152,7 +154,7 @@ func TestExportersBuilder_BuildLogs(t *testing.T) {
 	// This should result in creating an exporter that has none of consumption
 	// functions set.
 	delete(cfg.Service.Pipelines, "logs")
-	exporters, err = NewExportersBuilder(zap.NewNop(), cfg, factories.Exporters).Build()
+	exporters, err = NewExportersBuilder(zap.NewNop(), componenttest.TestApplicationStartInfo(), cfg, factories.Exporters).Build()
 	assert.NotNil(t, exporters)
 	assert.Nil(t, err)
 
@@ -204,8 +206,8 @@ func TestExportersBuilder_StopAll(t *testing.T) {
 }
 
 func TestExportersBuilder_ErrorOnNilExporter(t *testing.T) {
-	bf := &badExporterFactory{}
-	fm := map[configmodels.Type]component.ExporterFactoryBase{
+	bf := newBadExporterFactory()
+	fm := map[configmodels.Type]component.ExporterFactory{
 		bf.Type(): bf,
 	}
 
@@ -218,6 +220,11 @@ func TestExportersBuilder_ErrorOnNilExporter(t *testing.T) {
 		{
 			Name:      "metrics",
 			InputType: configmodels.MetricsDataType,
+			Exporters: []string{string(bf.Type())},
+		},
+		{
+			Name:      "logs",
+			InputType: configmodels.LogsDataType,
 			Exporters: []string{string(bf.Type())},
 		},
 	}
@@ -239,28 +246,15 @@ func TestExportersBuilder_ErrorOnNilExporter(t *testing.T) {
 				},
 			}
 
-			exporters, err := NewExportersBuilder(zap.NewNop(), cfg, fm).Build()
+			exporters, err := NewExportersBuilder(zap.NewNop(), componenttest.TestApplicationStartInfo(), cfg, fm).Build()
 			assert.Error(t, err)
 			assert.Zero(t, len(exporters))
 		})
 	}
 }
 
-// badExporterFactory is a factory that returns no error but returns a nil object.
-type badExporterFactory struct{}
-
-func (b *badExporterFactory) Type() configmodels.Type {
-	return "bf"
-}
-
-func (b *badExporterFactory) CreateDefaultConfig() configmodels.Exporter {
-	return &configmodels.ExporterSettings{}
-}
-
-func (b *badExporterFactory) CreateTraceExporter(_ *zap.Logger, _ configmodels.Exporter) (component.TraceExporterOld, error) {
-	return nil, nil
-}
-
-func (b *badExporterFactory) CreateMetricsExporter(_ *zap.Logger, _ configmodels.Exporter) (component.MetricsExporterOld, error) {
-	return nil, nil
+func newBadExporterFactory() component.ExporterFactory {
+	return exporterhelper.NewFactory("bf", func() configmodels.Exporter {
+		return &configmodels.ExporterSettings{}
+	})
 }

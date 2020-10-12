@@ -1,10 +1,10 @@
-// Copyright 2020 The OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,14 +26,43 @@ import (
 	"go.uber.org/zap"
 
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/config/configtls"
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/internal/data/testdata"
 )
 
-func TestNewExporter_wrong_version(t *testing.T) {
-	c := Config{ProtocolVersion: "0.0.0"}
-	exp, err := newExporter(c, component.ExporterCreateParams{})
+func TestNewExporter_err_version(t *testing.T) {
+	c := Config{ProtocolVersion: "0.0.0", Encoding: defaultEncoding}
+	exp, err := newExporter(c, component.ExporterCreateParams{}, defaultMarshallers())
 	assert.Error(t, err)
+	assert.Nil(t, exp)
+}
+
+func TestNewExporter_err_encoding(t *testing.T) {
+	c := Config{Encoding: "foo"}
+	exp, err := newExporter(c, component.ExporterCreateParams{}, defaultMarshallers())
+	assert.EqualError(t, err, errUnrecognizedEncoding.Error())
+	assert.Nil(t, exp)
+}
+
+func TestNewExporter_err_auth_type(t *testing.T) {
+	c := Config{
+		ProtocolVersion: "2.0.0",
+		Authentication: Authentication{
+			TLS: &configtls.TLSClientSetting{
+				TLSSetting: configtls.TLSSetting{
+					CAFile: "/doesnotexist",
+				},
+			},
+		},
+		Encoding: defaultEncoding,
+		Metadata: Metadata{
+			Full: false,
+		},
+	}
+	exp, err := newExporter(c, component.ExporterCreateParams{}, defaultMarshallers())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to load TLS config")
 	assert.Nil(t, exp)
 }
 
@@ -44,9 +73,11 @@ func TestTraceDataPusher(t *testing.T) {
 
 	p := kafkaProducer{
 		producer:   producer,
-		marshaller: &protoMarshaller{},
+		marshaller: &otlpProtoMarshaller{},
 	}
-	defer p.Close(context.Background())
+	t.Cleanup(func() {
+		require.NoError(t, p.Close(context.Background()))
+	})
 	droppedSpans, err := p.traceDataPusher(context.Background(), testdata.GenerateTraceDataTwoSpansSameResource())
 	require.NoError(t, err)
 	assert.Equal(t, 0, droppedSpans)
@@ -60,10 +91,12 @@ func TestTraceDataPusher_err(t *testing.T) {
 
 	p := kafkaProducer{
 		producer:   producer,
-		marshaller: &protoMarshaller{},
+		marshaller: &otlpProtoMarshaller{},
 		logger:     zap.NewNop(),
 	}
-	defer p.Close(context.Background())
+	t.Cleanup(func() {
+		require.NoError(t, p.Close(context.Background()))
+	})
 	td := testdata.GenerateTraceDataTwoSpansSameResource()
 	droppedSpans, err := p.traceDataPusher(context.Background(), td)
 	assert.EqualError(t, err, expErr.Error())
@@ -78,6 +111,7 @@ func TestTraceDataPusher_marshall_error(t *testing.T) {
 	}
 	td := testdata.GenerateTraceDataTwoSpansSameResource()
 	droppedSpans, err := p.traceDataPusher(context.Background(), td)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), expErr.Error())
 	assert.Equal(t, td.SpanCount(), droppedSpans)
 }
@@ -86,8 +120,12 @@ type errorMarshaller struct {
 	err error
 }
 
-var _ marshaller = (*errorMarshaller)(nil)
+var _ Marshaller = (*errorMarshaller)(nil)
 
-func (e errorMarshaller) Marshal(pdata.Traces) ([]byte, error) {
+func (e errorMarshaller) Marshal(traces pdata.Traces) ([]Message, error) {
 	return nil, e.err
+}
+
+func (e errorMarshaller) Encoding() string {
+	panic("implement me")
 }

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	collectortrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/trace/v1"
+	v1 "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/common/v1"
 	otlptrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/trace/v1"
 	"go.opentelemetry.io/collector/obsreport"
 	"go.opentelemetry.io/collector/testutil"
@@ -64,13 +65,13 @@ func TestExport(t *testing.T) {
 				{
 					Spans: []*otlptrace.Span{
 						{
-							TraceId:           traceID,
-							SpanId:            spanID,
+							TraceId:           v1.NewTraceID(traceID),
+							SpanId:            v1.NewSpanID(spanID),
 							Name:              "operationB",
-							Kind:              otlptrace.Span_SERVER,
+							Kind:              otlptrace.Span_SPAN_KIND_SERVER,
 							StartTimeUnixNano: unixnanos,
 							EndTimeUnixNano:   unixnanos,
-							Status:            &otlptrace.Status{Message: "status-cancelled", Code: otlptrace.Status_Cancelled},
+							Status:            &otlptrace.Status{Message: "status-cancelled", Code: otlptrace.Status_STATUS_CODE_CANCELLED},
 							TraceState:        "a=text,b=123",
 						},
 					},

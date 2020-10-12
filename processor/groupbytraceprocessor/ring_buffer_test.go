@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,12 +28,12 @@ func TestRingBufferCapacity(t *testing.T) {
 
 	// test
 	traceIDs := []pdata.TraceID{
-		{1, 2, 3, 4},
-		{2, 3, 4, 5},
-		{3, 4, 5, 6},
-		{4, 5, 6, 7},
-		{5, 6, 7, 8},
-		{6, 7, 8, 9},
+		pdata.NewTraceID([]byte{1, 2, 3, 4}),
+		pdata.NewTraceID([]byte{2, 3, 4, 5}),
+		pdata.NewTraceID([]byte{3, 4, 5, 6}),
+		pdata.NewTraceID([]byte{4, 5, 6, 7}),
+		pdata.NewTraceID([]byte{5, 6, 7, 8}),
+		pdata.NewTraceID([]byte{6, 7, 8, 9}),
 	}
 	for _, traceID := range traceIDs {
 		buffer.put(traceID)

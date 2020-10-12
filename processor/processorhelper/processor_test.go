@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,6 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/internal/data/testdata"
 )
@@ -110,7 +109,7 @@ func TestNewMetricsExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NoError(t, me.Start(context.Background(), componenttest.NewNopHost()))
-	assert.NoError(t, me.ConsumeMetrics(context.Background(), pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataEmpty())))
+	assert.NoError(t, me.ConsumeMetrics(context.Background(), testdata.GenerateMetricsEmpty()))
 	assert.NoError(t, me.Shutdown(context.Background()))
 }
 
@@ -126,7 +125,13 @@ func TestNewMetricsExporter_ProcessMetricsError(t *testing.T) {
 	want := errors.New("my_error")
 	me, err := NewMetricsProcessor(testCfg, exportertest.NewNopMetricsExporter(), newTestMProcessor(want))
 	require.NoError(t, err)
-	assert.Equal(t, want, me.ConsumeMetrics(context.Background(), pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataEmpty())))
+	assert.Equal(t, want, me.ConsumeMetrics(context.Background(), testdata.GenerateMetricsEmpty()))
+}
+
+func TestNewMetricsExporter_ProcessMetricsErrSkipProcessingData(t *testing.T) {
+	me, err := NewMetricsProcessor(testCfg, exportertest.NewNopMetricsExporter(), newTestMProcessor(ErrSkipProcessingData))
+	require.NoError(t, err)
+	assert.Equal(t, nil, me.ConsumeMetrics(context.Background(), testdata.GenerateMetricsEmpty()))
 }
 
 func TestNewLogsExporter(t *testing.T) {

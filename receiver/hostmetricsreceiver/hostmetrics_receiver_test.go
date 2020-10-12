@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,6 @@ import (
 
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver/internal"
 	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver/internal/scraper/cpuscraper"
@@ -140,10 +139,8 @@ func TestGatherMetrics_EndToEnd(t *testing.T) {
 }
 
 func assertIncludesStandardMetrics(t *testing.T, got pdata.Metrics) {
-	md := pdatautil.MetricsToInternalMetrics(got)
-
 	// get the first ResourceMetrics object
-	rms := md.ResourceMetrics()
+	rms := got.ResourceMetrics()
 	require.GreaterOrEqual(t, rms.Len(), 1)
 	rm := rms.At(0)
 	assert.True(t, rm.Resource().IsNil() || rm.Resource().Attributes().Len() == 0)
@@ -164,11 +161,9 @@ func assertIncludesResourceMetrics(t *testing.T, got pdata.Metrics) {
 		return
 	}
 
-	md := pdatautil.MetricsToInternalMetrics(got)
-
 	// get the superset of metrics returned by all resource metrics (excluding the first)
 	returnedMetrics := make(map[string]struct{})
-	rms := md.ResourceMetrics()
+	rms := got.ResourceMetrics()
 	for i := 1; i < rms.Len(); i++ {
 		rm := rms.At(i)
 		assert.Greater(t, rm.Resource().Attributes().Len(), 0)
@@ -191,7 +186,7 @@ func getMetricSlice(t *testing.T, rm pdata.ResourceMetrics) pdata.MetricSlice {
 func getReturnedMetricNames(metrics pdata.MetricSlice) map[string]struct{} {
 	metricNames := make(map[string]struct{})
 	for i := 0; i < metrics.Len(); i++ {
-		metricNames[metrics.At(i).MetricDescriptor().Name()] = struct{}{}
+		metricNames[metrics.At(i).Name()] = struct{}{}
 	}
 	return metricNames
 }
@@ -211,14 +206,14 @@ type mockFactory struct{ mock.Mock }
 type mockScraper struct{ mock.Mock }
 
 func (m *mockFactory) CreateDefaultConfig() internal.Config { return &mockConfig{} }
-func (m *mockFactory) CreateMetricsScraper(ctx context.Context, logger *zap.Logger, cfg internal.Config) (internal.Scraper, error) {
+func (m *mockFactory) CreateMetricsScraper(context.Context, *zap.Logger, internal.Config) (internal.Scraper, error) {
 	args := m.MethodCalled("CreateMetricsScraper")
 	return args.Get(0).(internal.Scraper), args.Error(1)
 }
 
-func (m *mockScraper) Initialize(ctx context.Context) error { return nil }
-func (m *mockScraper) Close(ctx context.Context) error      { return nil }
-func (m *mockScraper) ScrapeMetrics(ctx context.Context) (pdata.MetricSlice, error) {
+func (m *mockScraper) Initialize(context.Context) error { return nil }
+func (m *mockScraper) Close(context.Context) error      { return nil }
+func (m *mockScraper) ScrapeMetrics(context.Context) (pdata.MetricSlice, error) {
 	return pdata.NewMetricSlice(), errors.New("err1")
 }
 
@@ -226,14 +221,14 @@ type mockResourceFactory struct{ mock.Mock }
 type mockResourceScraper struct{ mock.Mock }
 
 func (m *mockResourceFactory) CreateDefaultConfig() internal.Config { return &mockConfig{} }
-func (m *mockResourceFactory) CreateMetricsScraper(ctx context.Context, logger *zap.Logger, cfg internal.Config) (internal.ResourceScraper, error) {
+func (m *mockResourceFactory) CreateMetricsScraper(context.Context, *zap.Logger, internal.Config) (internal.ResourceScraper, error) {
 	args := m.MethodCalled("CreateMetricsScraper")
 	return args.Get(0).(internal.ResourceScraper), args.Error(1)
 }
 
-func (m *mockResourceScraper) Initialize(ctx context.Context) error { return nil }
-func (m *mockResourceScraper) Close(ctx context.Context) error      { return nil }
-func (m *mockResourceScraper) ScrapeMetrics(ctx context.Context) (pdata.ResourceMetricsSlice, error) {
+func (m *mockResourceScraper) Initialize(context.Context) error { return nil }
+func (m *mockResourceScraper) Close(context.Context) error      { return nil }
+func (m *mockResourceScraper) ScrapeMetrics(context.Context) (pdata.ResourceMetricsSlice, error) {
 	return pdata.NewResourceMetricsSlice(), errors.New("err2")
 }
 
@@ -300,7 +295,7 @@ func TestGatherMetrics_Error(t *testing.T) {
 
 	// expect to get one empty resource metrics entry
 	require.Equal(t, 1, len(got))
-	rm := pdatautil.MetricsToInternalMetrics(got[0]).ResourceMetrics()
+	rm := got[0].ResourceMetrics()
 	require.Equal(t, 1, rm.Len())
 	ilm := rm.At(0).InstrumentationLibraryMetrics()
 	require.Equal(t, 1, ilm.Len())

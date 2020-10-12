@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,7 @@ import (
 
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver/internal"
+	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver/internal/metadata"
 )
 
 func TestScrapeMetrics(t *testing.T) {
@@ -66,12 +67,12 @@ func TestScrapeMetrics(t *testing.T) {
 
 			assert.Equal(t, 1, metrics.Len())
 
-			assertMemoryUsageMetricValid(t, metrics.At(0), memoryUsageDescriptor)
+			assertMemoryUsageMetricValid(t, metrics.At(0), metadata.Metrics.SystemMemoryUsage)
 
 			if runtime.GOOS == "linux" {
 				assertMemoryUsageMetricHasLinuxSpecificStateLabels(t, metrics.At(0))
 			} else if runtime.GOOS != "windows" {
-				internal.AssertInt64MetricLabelHasValue(t, metrics.At(0), 2, stateLabelName, inactiveStateLabelValue)
+				internal.AssertIntSumMetricLabelHasValue(t, metrics.At(0), 2, metadata.Labels.MemState, metadata.LabelMemState.Inactive)
 			}
 
 			internal.AssertSameTimeStampForAllMetrics(t, metrics)
@@ -79,16 +80,16 @@ func TestScrapeMetrics(t *testing.T) {
 	}
 }
 
-func assertMemoryUsageMetricValid(t *testing.T, metric pdata.Metric, descriptor pdata.MetricDescriptor) {
-	internal.AssertDescriptorEqual(t, descriptor, metric.MetricDescriptor())
-	assert.GreaterOrEqual(t, metric.Int64DataPoints().Len(), 2)
-	internal.AssertInt64MetricLabelHasValue(t, metric, 0, stateLabelName, usedStateLabelValue)
-	internal.AssertInt64MetricLabelHasValue(t, metric, 1, stateLabelName, freeStateLabelValue)
+func assertMemoryUsageMetricValid(t *testing.T, metric pdata.Metric, descriptor pdata.Metric) {
+	internal.AssertDescriptorEqual(t, descriptor, metric)
+	assert.GreaterOrEqual(t, metric.IntSum().DataPoints().Len(), 2)
+	internal.AssertIntSumMetricLabelHasValue(t, metric, 0, metadata.Labels.MemState, metadata.LabelMemState.Used)
+	internal.AssertIntSumMetricLabelHasValue(t, metric, 1, metadata.Labels.MemState, metadata.LabelMemState.Free)
 }
 
 func assertMemoryUsageMetricHasLinuxSpecificStateLabels(t *testing.T, metric pdata.Metric) {
-	internal.AssertInt64MetricLabelHasValue(t, metric, 2, stateLabelName, bufferedStateLabelValue)
-	internal.AssertInt64MetricLabelHasValue(t, metric, 3, stateLabelName, cachedStateLabelValue)
-	internal.AssertInt64MetricLabelHasValue(t, metric, 4, stateLabelName, slabReclaimableStateLabelValue)
-	internal.AssertInt64MetricLabelHasValue(t, metric, 5, stateLabelName, slabUnreclaimableStateLabelValue)
+	internal.AssertIntSumMetricLabelHasValue(t, metric, 2, metadata.Labels.MemState, metadata.LabelMemState.Buffered)
+	internal.AssertIntSumMetricLabelHasValue(t, metric, 3, metadata.Labels.MemState, metadata.LabelMemState.Cached)
+	internal.AssertIntSumMetricLabelHasValue(t, metric, 4, metadata.Labels.MemState, metadata.LabelMemState.SlabReclaimable)
+	internal.AssertIntSumMetricLabelHasValue(t, metric, 5, metadata.Labels.MemState, metadata.LabelMemState.SlabUnreclaimable)
 }

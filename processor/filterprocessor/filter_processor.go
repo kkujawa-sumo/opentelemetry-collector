@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,9 @@ package filterprocessor
 import (
 	"context"
 
-	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
-
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
 	"go.opentelemetry.io/collector/internal/processor/filtermetric"
+	"go.opentelemetry.io/collector/processor/processorhelper"
 )
 
 type filterMetricProcessor struct {
@@ -62,26 +60,40 @@ func createMatcher(mp *filtermetric.MatchProperties) (*filtermetric.Matcher, err
 	return &matcher, nil
 }
 
-// ProcessMetrics filters the given spans based off the filterMetricProcessor's filters.
-func (fmp *filterMetricProcessor) ProcessMetrics(_ context.Context, md pdata.Metrics) (pdata.Metrics, error) {
-	mds := pdatautil.MetricsToMetricsData(md)
-	for i := range mds {
-		if len(mds[i].Metrics) == 0 {
+// ProcessMetrics filters the given metrics based off the filterMetricProcessor's filters.
+func (fmp *filterMetricProcessor) ProcessMetrics(_ context.Context, pdm pdata.Metrics) (pdata.Metrics, error) {
+	rms := pdm.ResourceMetrics()
+	idx := newMetricIndex()
+	for i := 0; i < rms.Len(); i++ {
+		rm := rms.At(i)
+		if rm.IsNil() {
 			continue
 		}
-		keep := make([]*metricspb.Metric, 0, len(mds[i].Metrics))
-		for _, m := range mds[i].Metrics {
-			if fmp.shouldKeepMetric(m) {
-				keep = append(keep, m)
+		ilms := rm.InstrumentationLibraryMetrics()
+		for j := 0; j < ilms.Len(); j++ {
+			ilm := ilms.At(j)
+			if ilm.IsNil() {
+				continue
+			}
+			ms := ilm.Metrics()
+			for k := 0; k < ms.Len(); k++ {
+				metric := ms.At(k)
+				if metric.IsNil() {
+					continue
+				}
+				if fmp.shouldKeepMetric(metric) {
+					idx.add(i, j, k)
+				}
 			}
 		}
-		mds[i].Metrics = keep
 	}
-	return pdatautil.MetricsFromMetricsData(mds), nil
+	if idx.isEmpty() {
+		return pdm, processorhelper.ErrSkipProcessingData
+	}
+	return idx.extract(pdm), nil
 }
 
-// shouldKeepMetric determines whether a metric should be kept based off the filterMetricProcessor's filters.
-func (fmp *filterMetricProcessor) shouldKeepMetric(metric *metricspb.Metric) bool {
+func (fmp *filterMetricProcessor) shouldKeepMetric(metric pdata.Metric) bool {
 	if fmp.include != nil {
 		if !fmp.include.MatchMetric(metric) {
 			return false

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,11 @@ import (
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/obsreport"
 )
+
+// ErrSkipProcessingData is a sentinel value to indicate when traces or metrics should intentionally be dropped
+// from further processing in the pipeline because the data is determined to be irrelevant. A processor can return this error
+// to stop further processing without propagating an error back up the pipeline to logs.
+var ErrSkipProcessingData = errors.New("sentinel error to skip processing data from the remainder of the pipeline")
 
 // Start specifies the function invoked when the processor is being started.
 type Start func(context.Context, component.Host) error
@@ -172,6 +177,9 @@ func (mp *metricsProcessor) ConsumeMetrics(ctx context.Context, md pdata.Metrics
 	var err error
 	md, err = mp.processor.ProcessMetrics(processorCtx, md)
 	if err != nil {
+		if err == ErrSkipProcessingData {
+			return nil
+		}
 		return err
 	}
 	return mp.nextConsumer.ConsumeMetrics(ctx, md)

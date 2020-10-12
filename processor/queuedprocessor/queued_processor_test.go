@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,11 +30,10 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/config/configtelemetry"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumererror"
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
-	"go.opentelemetry.io/collector/internal/collector/telemetry"
 	"go.opentelemetry.io/collector/internal/data/testdata"
 	"go.opentelemetry.io/collector/obsreport/obsreporttest"
 	"go.opentelemetry.io/collector/processor"
@@ -187,7 +186,7 @@ func TestMetricsQueueProcessor_NoEnqueueOnPermanentError(t *testing.T) {
 	require.NoError(t, err)
 	defer doneFn()
 
-	md := pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataTwoMetrics())
+	md := testdata.GenerateMetricsTwoMetrics()
 
 	mockP := newMockConcurrentSpanProcessor()
 	mockP.updateError(consumererror.Permanent(errors.New("bad data")))
@@ -219,7 +218,7 @@ func TestMetricsQueueProcessor_NoEnqueueOnNoRetry(t *testing.T) {
 	require.NoError(t, err)
 	defer doneFn()
 
-	md := pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataTwoMetrics())
+	md := testdata.GenerateMetricsTwoMetrics()
 
 	mockP := newMockConcurrentSpanProcessor()
 	mockP.updateError(errors.New("transient error"))
@@ -251,7 +250,7 @@ func TestMetricsQueueProcessor_EnqueueOnError(t *testing.T) {
 	require.NoError(t, err)
 	defer doneFn()
 
-	md := pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataTwoMetrics())
+	md := testdata.GenerateMetricsTwoMetrics()
 
 	mockP := newMockConcurrentSpanProcessor()
 	mockP.updateError(errors.New("transient error"))
@@ -290,7 +289,7 @@ func TestTraceQueueProcessorHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	defer doneFn()
 
-	views := processor.MetricViews(telemetry.Detailed)
+	views := processor.MetricViews(configtelemetry.LevelDetailed)
 	assert.NoError(t, view.Register(views...))
 	defer view.Unregister(views...)
 
@@ -350,7 +349,7 @@ func TestMetricsQueueProcessorHappyPath(t *testing.T) {
 	wantBatches := 10
 	wantMetricPoints := 2 * 20
 	for i := 0; i < wantBatches; i++ {
-		md := pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataTwoMetrics())
+		md := testdata.GenerateMetricsTwoMetrics()
 		mockP.run(func() {
 			require.NoError(t, qp.ConsumeMetrics(context.Background(), md))
 		})
@@ -398,7 +397,7 @@ func (p *mockConcurrentSpanProcessor) ConsumeMetrics(_ context.Context, md pdata
 		return nil
 	}
 	atomic.AddInt64(&p.batchCount, 1)
-	_, mpc := pdatautil.MetricAndDataPointCount(md)
+	_, mpc := md.MetricAndDataPointCount()
 	atomic.AddInt64(&p.metricPointsCount, int64(mpc))
 	p.mu.Lock()
 	defer p.mu.Unlock()

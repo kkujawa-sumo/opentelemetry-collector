@@ -17,6 +17,7 @@ package sampling
 import (
 	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.uber.org/zap"
 )
 
@@ -45,7 +46,7 @@ func (df *durationFilter) OnLateArrivingSpans(earlyDecision Decision, spans []*t
 }
 
 // EvaluateSecondChance looks at the trace again and if it can/cannot be fit, returns a SamplingDecision
-func (df *durationFilter) EvaluateSecondChance(traceID []byte, trace *TraceData) (Decision, error) {
+func (df *durationFilter) EvaluateSecondChance(_ pdata.TraceID, trace *TraceData) (Decision, error) {
 	return NotSampled, nil
 }
 
@@ -54,7 +55,7 @@ func tsToMicros(ts *timestamp.Timestamp) int64 {
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (df *durationFilter) Evaluate(traceID []byte, trace *TraceData) (Decision, error) {
+func (df *durationFilter) Evaluate(_ pdata.TraceID, trace *TraceData) (Decision, error) {
 	trace.Lock()
 	batches := trace.ReceivedBatches
 	trace.Unlock()
@@ -93,6 +94,6 @@ func (df *durationFilter) Evaluate(traceID []byte, trace *TraceData) (Decision, 
 
 // OnDroppedSpans is called when the trace needs to be dropped, due to memory
 // pressure, before the decision_wait time has been reached.
-func (df *durationFilter) OnDroppedSpans(traceID []byte, trace *TraceData) (Decision, error) {
+func (df *durationFilter) OnDroppedSpans(_ pdata.TraceID, _ *TraceData) (Decision, error) {
 	return NotSampled, nil
 }

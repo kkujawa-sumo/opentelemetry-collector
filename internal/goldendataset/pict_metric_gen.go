@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,28 +15,30 @@
 package goldendataset
 
 import (
+	"fmt"
+
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/internal/data"
 )
 
 // GenerateMetricDatas takes the filename of a PICT-generated file, walks through all of the rows in the PICT
 // file and for each row, generates a MetricData object, collecting them and returning them to the caller.
-func GenerateMetricDatas(metricPairsFile string) ([]data.MetricData, error) {
+func GenerateMetricDatas(metricPairsFile string) ([]pdata.Metrics, error) {
 	pictData, err := loadPictOutputFile(metricPairsFile)
 	if err != nil {
 		return nil, err
 	}
-	var out []data.MetricData
+	var out []pdata.Metrics
 	for i, values := range pictData {
 		if i == 0 {
 			continue
 		}
 		metricInputs := PICTMetricInputs{
 			NumPtsPerMetric: PICTNumPtsPerMetric(values[0]),
-			MetricType:      PICTMetricType(values[1]),
+			MetricType:      PICTMetricDataType(values[1]),
 			NumPtLabels:     PICTNumPtLabels(values[2]),
 		}
 		cfg := pictToCfg(metricInputs)
+		cfg.MetricNamePrefix = fmt.Sprintf("pict_%d_", i)
 		md := MetricDataFromCfg(cfg)
 		out = append(out, md)
 	}
@@ -62,18 +64,28 @@ func pictToCfg(inputs PICTMetricInputs) MetricCfg {
 	}
 
 	switch inputs.MetricType {
-	case MetricTypeInt:
-		cfg.MetricDescriptorType = pdata.MetricTypeInt64
-	case MetricTypeMonotonicInt:
-		cfg.MetricDescriptorType = pdata.MetricTypeMonotonicInt64
-	case MetricTypeDouble:
-		cfg.MetricDescriptorType = pdata.MetricTypeDouble
-	case MetricTypeMonotonicDouble:
-		cfg.MetricDescriptorType = pdata.MetricTypeMonotonicDouble
-	case MetricTypeHistogram:
-		cfg.MetricDescriptorType = pdata.MetricTypeHistogram
-	case MetricTypeSummary:
-		cfg.MetricDescriptorType = pdata.MetricTypeSummary
+	case MetricTypeIntGauge:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeIntGauge
+	case MetricTypeMonotonicIntSum:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeIntSum
+		cfg.IsMonotonicSum = true
+	case MetricTypeNonMonotonicIntSum:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeIntSum
+		cfg.IsMonotonicSum = false
+	case MetricTypeDoubleGauge:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeDoubleGauge
+	case MetricTypeMonotonicDoubleSum:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeDoubleSum
+		cfg.IsMonotonicSum = true
+	case MetricTypeNonMonotonicDoubleSum:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeDoubleSum
+		cfg.IsMonotonicSum = false
+	case MetricTypeIntHistogram:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeIntHistogram
+	case MetricTypeDoubleHistogram:
+		cfg.MetricDescriptorType = pdata.MetricDataTypeDoubleHistogram
+	default:
+		panic("Should not happen, unsupported type " + string(inputs.MetricType))
 	}
 
 	switch inputs.NumPtLabels {

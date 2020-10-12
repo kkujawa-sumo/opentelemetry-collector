@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,6 +35,14 @@ func TestCreateDefaultConfig(t *testing.T) {
 	cfg := factory.CreateDefaultConfig()
 	assert.NotNil(t, cfg, "failed to create default config")
 	assert.NoError(t, configcheck.ValidateConfig(cfg))
+	ocfg, ok := factory.CreateDefaultConfig().(*Config)
+	assert.True(t, ok)
+	assert.Equal(t, ocfg.RetrySettings.Enabled, true, "default retry is enabled")
+	assert.Equal(t, ocfg.RetrySettings.MaxElapsedTime, 300*time.Second, "default retry MaxElapsedTime")
+	assert.Equal(t, ocfg.RetrySettings.InitialInterval, 5*time.Second, "default retry InitialInterval")
+	assert.Equal(t, ocfg.RetrySettings.MaxInterval, 30*time.Second, "default retry MaxInterval")
+	assert.Equal(t, ocfg.QueueSettings.Enabled, false, "default sending queue is disabled")
+	assert.Equal(t, ocfg.Timeout, 5*time.Second, "default timeout is 5 second")
 }
 
 func TestCreateMetricsExporter(t *testing.T) {
@@ -186,7 +194,7 @@ func TestCreateLogsExporter(t *testing.T) {
 	cfg.GRPCClientSettings.Endpoint = testutil.GetAvailableLocalAddress(t)
 
 	creationParams := component.ExporterCreateParams{Logger: zap.NewNop()}
-	oexp, err := factory.(component.LogsExporterFactory).CreateLogsExporter(context.Background(), creationParams, cfg)
+	oexp, err := factory.CreateLogsExporter(context.Background(), creationParams, cfg)
 	require.Nil(t, err)
 	require.NotNil(t, oexp)
 }

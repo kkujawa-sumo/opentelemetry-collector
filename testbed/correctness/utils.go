@@ -1,3 +1,17 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package correctness
 
 import (
@@ -125,16 +139,15 @@ func ConstructTraceSender(t *testing.T, receiver string) testbed.DataSender {
 }
 
 // ConstructMetricsSender creates a testbed metrics sender from the passed-in metrics sender identifier.
-func ConstructMetricsSender(t *testing.T, receiver string) testbed.DataSender {
-	var sender testbed.DataSender
+func ConstructMetricsSender(t *testing.T, receiver string) testbed.MetricDataSender {
+	var sender testbed.MetricDataSender
 	switch receiver {
 	case "otlp":
 		sender = testbed.NewOTLPMetricDataSender(testbed.DefaultHost, testbed.GetAvailablePort(t))
 	case "opencensus":
 		sender = testbed.NewOCMetricDataSender(testbed.DefaultHost, testbed.GetAvailablePort(t))
-	// will be uncommented in a subsequent PR
-	// case "prometheus":
-	// 	sender = testbed.NewPrometheusDataSender(testbed.DefaultHost, testbed.GetAvailablePort(t))
+	case "prometheus":
+		sender = testbed.NewPrometheusDataSender(testbed.DefaultHost, testbed.GetAvailablePort(t))
 	default:
 		t.Errorf("unknown receiver type: %s", receiver)
 	}
@@ -153,9 +166,8 @@ func ConstructReceiver(t *testing.T, exporter string) testbed.DataReceiver {
 		receiver = testbed.NewJaegerDataReceiver(testbed.GetAvailablePort(t))
 	case "zipkin":
 		receiver = testbed.NewZipkinDataReceiver(testbed.GetAvailablePort(t))
-	// will be uncommented in a subsequent PR
-	// case "prometheus":
-	// 	receiver = testbed.NewPrometheusDataReceiver(testbed.GetAvailablePort(t))
+	case "prometheus":
+		receiver = testbed.NewPrometheusDataReceiver(testbed.GetAvailablePort(t))
 	default:
 		t.Errorf("unknown exporter type: %s", exporter)
 	}

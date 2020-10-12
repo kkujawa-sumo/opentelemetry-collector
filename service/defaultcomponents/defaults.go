@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,7 @@ import (
 	"go.opentelemetry.io/collector/exporter/opencensusexporter"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	"go.opentelemetry.io/collector/exporter/prometheusexporter"
+	"go.opentelemetry.io/collector/exporter/prometheusremotewriteexporter"
 	"go.opentelemetry.io/collector/exporter/zipkinexporter"
 	"go.opentelemetry.io/collector/extension/fluentbitextension"
 	"go.opentelemetry.io/collector/extension/healthcheckextension"
@@ -43,6 +44,7 @@ import (
 	"go.opentelemetry.io/collector/receiver/fluentforwardreceiver"
 	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver"
 	"go.opentelemetry.io/collector/receiver/jaegerreceiver"
+	"go.opentelemetry.io/collector/receiver/kafkareceiver"
 	"go.opentelemetry.io/collector/receiver/opencensusreceiver"
 	"go.opentelemetry.io/collector/receiver/otlpreceiver"
 	"go.opentelemetry.io/collector/receiver/prometheusreceiver"
@@ -72,17 +74,19 @@ func Components() (
 		fluentforwardreceiver.NewFactory(),
 		zipkinreceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
-		&opencensusreceiver.Factory{},
+		opencensusreceiver.NewFactory(),
 		otlpreceiver.NewFactory(),
 		hostmetricsreceiver.NewFactory(),
+		kafkareceiver.NewFactory(),
 	)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
 	exporters, err := component.MakeExporterFactoryMap(
-		&opencensusexporter.Factory{},
+		opencensusexporter.NewFactory(),
 		prometheusexporter.NewFactory(),
+		prometheusremotewriteexporter.NewFactory(),
 		loggingexporter.NewFactory(),
 		zipkinexporter.NewFactory(),
 		jaegerexporter.NewFactory(),
@@ -100,8 +104,8 @@ func Components() (
 		queuedprocessor.NewFactory(),
 		batchprocessor.NewFactory(),
 		memorylimiter.NewFactory(),
-		&tailsamplingprocessor.Factory{},
-		&probabilisticsamplerprocessor.Factory{},
+		tailsamplingprocessor.NewFactory(),
+		probabilisticsamplerprocessor.NewFactory(),
 		spanprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
 		groupbytraceprocessor.NewFactory(),

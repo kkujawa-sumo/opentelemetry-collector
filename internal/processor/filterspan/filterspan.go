@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,15 +19,9 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/collector/consumer/pdata"
+	"go.opentelemetry.io/collector/internal/processor/filterconfig"
 	"go.opentelemetry.io/collector/internal/processor/filterhelper"
 	"go.opentelemetry.io/collector/internal/processor/filterset"
-)
-
-var (
-	// TODO Add processor type invoking the NewMatcher in error text.
-	errAtLeastOneMatchFieldNeeded = errors.New(
-		`error creating processor. At least one ` +
-			`of "services", "span_names" or "attributes" field must be specified"`)
 )
 
 // TODO: Modify Matcher to invoke both the include and exclude properties so
@@ -60,13 +54,13 @@ type attributeMatcher struct {
 }
 
 // NewMatcher creates a span Matcher that matches based on the given MatchProperties.
-func NewMatcher(mp *MatchProperties) (Matcher, error) {
+func NewMatcher(mp *filterconfig.MatchProperties) (Matcher, error) {
 	if mp == nil {
 		return nil, nil
 	}
 
-	if len(mp.Services) == 0 && len(mp.SpanNames) == 0 && len(mp.Attributes) == 0 {
-		return nil, errAtLeastOneMatchFieldNeeded
+	if err := mp.ValidateForSpans(); err != nil {
+		return nil, err
 	}
 
 	var err error
@@ -102,12 +96,12 @@ func NewMatcher(mp *MatchProperties) (Matcher, error) {
 	}, nil
 }
 
-func newAttributesMatcher(mp *MatchProperties) (attributesMatcher, error) {
+func newAttributesMatcher(mp *filterconfig.MatchProperties) (attributesMatcher, error) {
 	// attribute matching is only supported with strict matching
 	if mp.Config.MatchType != filterset.Strict {
 		return nil, fmt.Errorf(
 			"%s=%s is not supported for %q",
-			filterset.MatchTypeFieldName, filterset.Regexp, AttributesFieldName,
+			filterset.MatchTypeFieldName, filterset.Regexp, filterconfig.AttributesFieldName,
 		)
 	}
 

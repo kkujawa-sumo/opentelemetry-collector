@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,9 +17,9 @@ package filtermetric
 import (
 	"testing"
 
-	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	"github.com/stretchr/testify/assert"
 
+	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/internal/processor/filterset"
 )
 
@@ -42,19 +42,18 @@ var (
 	}
 )
 
-func createMetric(name string) *metricspb.Metric {
-	return &metricspb.Metric{
-		MetricDescriptor: &metricspb.MetricDescriptor{
-			Name: name,
-		},
-	}
+func createMetric(name string) pdata.Metric {
+	metric := pdata.NewMetric()
+	metric.InitEmpty()
+	metric.SetName(name)
+	return metric
 }
 
 func TestMatcherMatches(t *testing.T) {
 	tests := []struct {
 		name        string
 		cfg         *MatchProperties
-		metric      *metricspb.Metric
+		metric      pdata.Metric
 		shouldMatch bool
 	}{
 		{

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,8 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
-	"go.opentelemetry.io/collector/internal/data"
+	"go.opentelemetry.io/collector/internal"
 	collectorlogs "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/logs/v1"
 	collectormetrics "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/metrics/v1"
 	collectortrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/trace/v1"
@@ -57,7 +56,7 @@ func TestFileMetricsExporterNoErrors(t *testing.T) {
 	lme := &fileExporter{file: mf}
 	require.NotNil(t, lme)
 
-	md := pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataTwoMetrics())
+	md := testdata.GenerateMetricsTwoMetrics()
 	assert.NoError(t, lme.ConsumeMetrics(context.Background(), md))
 	assert.NoError(t, lme.Shutdown(context.Background()))
 
@@ -65,7 +64,7 @@ func TestFileMetricsExporterNoErrors(t *testing.T) {
 	var j collectormetrics.ExportMetricsServiceRequest
 	assert.NoError(t, unmarshaler.Unmarshal(mf, &j))
 
-	assert.EqualValues(t, data.MetricDataToOtlp(pdatautil.MetricsToInternalMetrics(md)), j.ResourceMetrics)
+	assert.EqualValues(t, pdata.MetricsToOtlp(md), j.ResourceMetrics)
 }
 
 func TestFileLogsExporterNoErrors(t *testing.T) {
@@ -120,7 +119,7 @@ func TestFileLogsExporterNoErrors(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(t, exporter.ConsumeLogs(context.Background(), pdata.LogsFromOtlp(ld)))
+	assert.NoError(t, exporter.ConsumeLogs(context.Background(), pdata.LogsFromInternalRep(internal.LogsFromOtlp(ld))))
 	assert.NoError(t, exporter.Shutdown(context.Background()))
 
 	var unmarshaler = &jsonpb.Unmarshaler{}
@@ -211,7 +210,7 @@ func TestFileLogsExporterErrors(t *testing.T) {
 			exporter := &fileExporter{file: mf}
 			require.NotNil(t, exporter)
 
-			assert.Error(t, exporter.ConsumeLogs(context.Background(), pdata.LogsFromOtlp(ld)))
+			assert.Error(t, exporter.ConsumeLogs(context.Background(), pdata.LogsFromInternalRep(internal.LogsFromOtlp(ld))))
 			assert.NoError(t, exporter.Shutdown(context.Background()))
 		})
 	}

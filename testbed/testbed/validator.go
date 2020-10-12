@@ -1,4 +1,4 @@
-// Copyright 2020, OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
 package testbed
 
 import (
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,6 @@ import (
 	"go.opentelemetry.io/collector/consumer/pdata"
 	otlpcommon "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/common/v1"
 	otlptrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/trace/v1"
-	"go.opentelemetry.io/collector/translator/internaldata"
 )
 
 // TestCaseValidator defines the interface for validating and reporting test results.
@@ -79,13 +79,13 @@ func (v *PerfTestValidator) RecordResults(tc *TestCase) {
 // CorrectnessTestValidator implements TestCaseValidator for test suites using CorrectnessResults for summarizing results.
 type CorrectnessTestValidator struct {
 	dataProvider      DataProvider
-	assertionFailures []*AssertionFailure
+	assertionFailures []*TraceAssertionFailure
 }
 
 func NewCorrectTestValidator(provider DataProvider) *CorrectnessTestValidator {
 	return &CorrectnessTestValidator{
 		dataProvider:      provider,
-		assertionFailures: make([]*AssertionFailure, 0),
+		assertionFailures: make([]*TraceAssertionFailure, 0),
 	}
 }
 
@@ -96,13 +96,6 @@ func (v *CorrectnessTestValidator) Validate(tc *TestCase) {
 	}
 	if len(tc.MockBackend.ReceivedTraces) > 0 {
 		v.assertSentRecdTracingDataEqual(tc.MockBackend.ReceivedTraces)
-	}
-	if len(tc.MockBackend.ReceivedTracesOld) > 0 {
-		tracesList := make([]pdata.Traces, 0, len(tc.MockBackend.ReceivedTracesOld))
-		for _, td := range tc.MockBackend.ReceivedTracesOld {
-			tracesList = append(tracesList, internaldata.OCToTraceData(td))
-		}
-		v.assertSentRecdTracingDataEqual(tracesList)
 	}
 	assert.EqualValues(tc.t, 0, len(v.assertionFailures), "There are span data mismatches.")
 }
@@ -118,13 +111,13 @@ func (v *CorrectnessTestValidator) RecordResults(tc *TestCase) {
 	// Remove "Test" prefix from test name.
 	testName := tc.t.Name()[4:]
 	tc.resultsSummary.Add(tc.t.Name(), &CorrectnessTestResult{
-		testName:              testName,
-		result:                result,
-		duration:              time.Since(tc.startTime),
-		receivedSpanCount:     tc.MockBackend.DataItemsReceived(),
-		sentSpanCount:         tc.LoadGenerator.DataItemsSent(),
-		assertionFailureCount: uint64(len(v.assertionFailures)),
-		assertionFailures:     v.assertionFailures,
+		testName:                   testName,
+		result:                     result,
+		duration:                   time.Since(tc.startTime),
+		receivedSpanCount:          tc.MockBackend.DataItemsReceived(),
+		sentSpanCount:              tc.LoadGenerator.DataItemsSent(),
+		traceAssertionFailureCount: uint64(len(v.assertionFailures)),
+		traceAssertionFailures:     v.assertionFailures,
 	})
 }
 
@@ -134,7 +127,7 @@ func (v *CorrectnessTestValidator) assertSentRecdTracingDataEqual(tracesList []p
 		for _, rs := range resourceSpansList {
 			for _, ils := range rs.InstrumentationLibrarySpans {
 				for _, recdSpan := range ils.Spans {
-					sentSpan := v.dataProvider.GetGeneratedSpan(recdSpan.TraceId, recdSpan.SpanId)
+					sentSpan := v.dataProvider.GetGeneratedSpan(pdata.TraceID(recdSpan.TraceId), pdata.SpanID(recdSpan.SpanId))
 					v.diffSpan(sentSpan, recdSpan)
 				}
 			}
@@ -145,7 +138,7 @@ func (v *CorrectnessTestValidator) assertSentRecdTracingDataEqual(tracesList []p
 
 func (v *CorrectnessTestValidator) diffSpan(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if sentSpan == nil {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: recdSpan.Name,
 		}
@@ -166,26 +159,26 @@ func (v *CorrectnessTestValidator) diffSpan(sentSpan *otlptrace.Span, recdSpan *
 }
 
 func (v *CorrectnessTestValidator) diffSpanTraceID(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
-	if hex.EncodeToString(sentSpan.TraceId) != hex.EncodeToString(recdSpan.TraceId) {
-		af := &AssertionFailure{
+	if sentSpan.TraceId.HexString() != recdSpan.TraceId.HexString() {
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "TraceId",
-			expectedValue: hex.EncodeToString(sentSpan.TraceId),
-			actualValue:   hex.EncodeToString(recdSpan.TraceId),
+			expectedValue: sentSpan.TraceId.HexString(),
+			actualValue:   recdSpan.TraceId.HexString(),
 		}
 		v.assertionFailures = append(v.assertionFailures, af)
 	}
 }
 
 func (v *CorrectnessTestValidator) diffSpanSpanID(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
-	if hex.EncodeToString(sentSpan.SpanId) != hex.EncodeToString(recdSpan.SpanId) {
-		af := &AssertionFailure{
+	if sentSpan.SpanId.HexString() != recdSpan.SpanId.HexString() {
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "SpanId",
-			expectedValue: hex.EncodeToString(sentSpan.SpanId),
-			actualValue:   hex.EncodeToString(recdSpan.SpanId),
+			expectedValue: sentSpan.SpanId.HexString(),
+			actualValue:   recdSpan.SpanId.HexString(),
 		}
 		v.assertionFailures = append(v.assertionFailures, af)
 	}
@@ -193,7 +186,7 @@ func (v *CorrectnessTestValidator) diffSpanSpanID(sentSpan *otlptrace.Span, recd
 
 func (v *CorrectnessTestValidator) diffSpanTraceState(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if sentSpan.TraceState != recdSpan.TraceState {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "TraceState",
@@ -205,21 +198,22 @@ func (v *CorrectnessTestValidator) diffSpanTraceState(sentSpan *otlptrace.Span, 
 }
 
 func (v *CorrectnessTestValidator) diffSpanParentSpanID(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
-	if hex.EncodeToString(sentSpan.ParentSpanId) != hex.EncodeToString(recdSpan.ParentSpanId) {
-		af := &AssertionFailure{
+	if sentSpan.ParentSpanId.HexString() != recdSpan.ParentSpanId.HexString() {
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "ParentSpanId",
-			expectedValue: hex.EncodeToString(sentSpan.ParentSpanId),
-			actualValue:   hex.EncodeToString(recdSpan.ParentSpanId),
+			expectedValue: sentSpan.ParentSpanId.HexString(),
+			actualValue:   recdSpan.ParentSpanId.HexString(),
 		}
 		v.assertionFailures = append(v.assertionFailures, af)
 	}
 }
 
 func (v *CorrectnessTestValidator) diffSpanName(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
-	if sentSpan.Name != recdSpan.Name {
-		af := &AssertionFailure{
+	// Because of https://github.com/openzipkin/zipkin-go/pull/166 compare lower cases.
+	if !strings.EqualFold(sentSpan.Name, recdSpan.Name) {
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "Name",
@@ -232,7 +226,7 @@ func (v *CorrectnessTestValidator) diffSpanName(sentSpan *otlptrace.Span, recdSp
 
 func (v *CorrectnessTestValidator) diffSpanKind(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if sentSpan.Kind != recdSpan.Kind {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "Kind",
@@ -245,7 +239,7 @@ func (v *CorrectnessTestValidator) diffSpanKind(sentSpan *otlptrace.Span, recdSp
 
 func (v *CorrectnessTestValidator) diffSpanTimestamps(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if notWithinOneMillisecond(sentSpan.StartTimeUnixNano, recdSpan.StartTimeUnixNano) {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "StartTimeUnixNano",
@@ -255,7 +249,7 @@ func (v *CorrectnessTestValidator) diffSpanTimestamps(sentSpan *otlptrace.Span, 
 		v.assertionFailures = append(v.assertionFailures, af)
 	}
 	if notWithinOneMillisecond(sentSpan.EndTimeUnixNano, recdSpan.EndTimeUnixNano) {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "EndTimeUnixNano",
@@ -268,7 +262,7 @@ func (v *CorrectnessTestValidator) diffSpanTimestamps(sentSpan *otlptrace.Span, 
 
 func (v *CorrectnessTestValidator) diffSpanAttributes(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if len(sentSpan.Attributes) != len(recdSpan.Attributes) {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "Attributes",
@@ -282,7 +276,7 @@ func (v *CorrectnessTestValidator) diffSpanAttributes(sentSpan *otlptrace.Span, 
 		v.diffAttributesSlice(sentSpan.Name, recdAttrs, sentAttrs, "Attributes[%s]")
 	}
 	if sentSpan.DroppedAttributesCount != recdSpan.DroppedAttributesCount {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "DroppedAttributesCount",
@@ -295,7 +289,7 @@ func (v *CorrectnessTestValidator) diffSpanAttributes(sentSpan *otlptrace.Span, 
 
 func (v *CorrectnessTestValidator) diffSpanEvents(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if len(sentSpan.Events) != len(recdSpan.Events) {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "Events",
@@ -312,7 +306,7 @@ func (v *CorrectnessTestValidator) diffSpanEvents(sentSpan *otlptrace.Span, recd
 				match = len(sentEvents) == len(recdEvents)
 			}
 			if !match {
-				af := &AssertionFailure{
+				af := &TraceAssertionFailure{
 					typeName:      "Span",
 					dataComboName: sentSpan.Name,
 					fieldPath:     fmt.Sprintf("Events[%s]", name),
@@ -324,7 +318,7 @@ func (v *CorrectnessTestValidator) diffSpanEvents(sentSpan *otlptrace.Span, recd
 				for i, sentEvent := range sentEvents {
 					recdEvent := recdEvents[i]
 					if notWithinOneMillisecond(sentEvent.TimeUnixNano, recdEvent.TimeUnixNano) {
-						af := &AssertionFailure{
+						af := &TraceAssertionFailure{
 							typeName:      "Span",
 							dataComboName: sentSpan.Name,
 							fieldPath:     fmt.Sprintf("Events[%s].TimeUnixNano", name),
@@ -340,7 +334,7 @@ func (v *CorrectnessTestValidator) diffSpanEvents(sentSpan *otlptrace.Span, recd
 		}
 	}
 	if sentSpan.DroppedEventsCount != recdSpan.DroppedEventsCount {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "DroppedEventsCount",
@@ -353,7 +347,7 @@ func (v *CorrectnessTestValidator) diffSpanEvents(sentSpan *otlptrace.Span, recd
 
 func (v *CorrectnessTestValidator) diffSpanLinks(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if len(sentSpan.Links) != len(recdSpan.Links) {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "Links",
@@ -364,13 +358,13 @@ func (v *CorrectnessTestValidator) diffSpanLinks(sentSpan *otlptrace.Span, recdS
 	} else {
 		recdLinksMap := convertLinksSliceToMap(recdSpan.Links)
 		for i, sentLink := range sentSpan.Links {
-			spanID := hex.EncodeToString(sentLink.SpanId)
+			spanID := sentLink.SpanId.HexString()
 			recdLink, ok := recdLinksMap[spanID]
 			if ok {
 				v.diffAttributesSlice(sentSpan.Name, sentLink.Attributes, recdLink.Attributes,
 					"Links["+spanID+"].Attributes[%s]")
 			} else {
-				af := &AssertionFailure{
+				af := &TraceAssertionFailure{
 					typeName:      "Span",
 					dataComboName: sentSpan.Name,
 					fieldPath:     fmt.Sprintf("Links[%d]", i),
@@ -383,7 +377,7 @@ func (v *CorrectnessTestValidator) diffSpanLinks(sentSpan *otlptrace.Span, recdS
 		}
 	}
 	if sentSpan.DroppedLinksCount != recdSpan.DroppedLinksCount {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "DroppedLinksCount",
@@ -397,7 +391,7 @@ func (v *CorrectnessTestValidator) diffSpanLinks(sentSpan *otlptrace.Span, recdS
 func (v *CorrectnessTestValidator) diffSpanStatus(sentSpan *otlptrace.Span, recdSpan *otlptrace.Span) {
 	if sentSpan.Status != nil && recdSpan.Status != nil {
 		if sentSpan.Status.Code != recdSpan.Status.Code {
-			af := &AssertionFailure{
+			af := &TraceAssertionFailure{
 				typeName:      "Span",
 				dataComboName: sentSpan.Name,
 				fieldPath:     "Status.Code",
@@ -407,7 +401,7 @@ func (v *CorrectnessTestValidator) diffSpanStatus(sentSpan *otlptrace.Span, recd
 			v.assertionFailures = append(v.assertionFailures, af)
 		}
 	} else if (sentSpan.Status != nil && recdSpan.Status == nil) || (sentSpan.Status == nil && recdSpan.Status != nil) {
-		af := &AssertionFailure{
+		af := &TraceAssertionFailure{
 			typeName:      "Span",
 			dataComboName: sentSpan.Name,
 			fieldPath:     "Status",
@@ -426,22 +420,17 @@ func (v *CorrectnessTestValidator) diffAttributesSlice(spanName string, recdAttr
 		if ok {
 			sentVal := retrieveAttributeValue(sentAttr)
 			recdVal := retrieveAttributeValue(recdAttr)
-			if !reflect.DeepEqual(sentVal, recdVal) {
-				sentStr := fmt.Sprintf("%v", sentVal)
-				recdStr := fmt.Sprintf("%v", recdVal)
-				if sentStr != recdStr {
-					af := &AssertionFailure{
-						typeName:      "Span",
-						dataComboName: spanName,
-						fieldPath:     fmt.Sprintf(fmtStr, sentAttr.Key),
-						expectedValue: sentVal,
-						actualValue:   recdVal,
-					}
-					v.assertionFailures = append(v.assertionFailures, af)
-				}
+			switch val := sentVal.(type) {
+			case *otlpcommon.KeyValueList:
+				v.compareKeyValueList(spanName, val, recdVal, fmtStr, sentAttr.Key)
+			case *otlpcommon.ArrayValue:
+				v.compareArrayList(spanName, val, recdVal, fmtStr, sentAttr.Key)
+			default:
+				v.compareSimpleValues(spanName, sentVal, recdVal, fmtStr, sentAttr.Key)
 			}
+
 		} else {
-			af := &AssertionFailure{
+			af := &TraceAssertionFailure{
 				typeName:      "Span",
 				dataComboName: spanName,
 				fieldPath:     fmt.Sprintf("Attributes[%s]", sentAttr.Key),
@@ -450,6 +439,64 @@ func (v *CorrectnessTestValidator) diffAttributesSlice(spanName string, recdAttr
 			}
 			v.assertionFailures = append(v.assertionFailures, af)
 		}
+	}
+}
+
+func (v *CorrectnessTestValidator) compareSimpleValues(spanName string, sentVal interface{}, recdVal interface{},
+	fmtStr string, attrKey string) {
+	if !reflect.DeepEqual(sentVal, recdVal) {
+		sentStr := fmt.Sprintf("%v", sentVal)
+		recdStr := fmt.Sprintf("%v", recdVal)
+		if !strings.EqualFold(sentStr, recdStr) {
+			af := &TraceAssertionFailure{
+				typeName:      "Span",
+				dataComboName: spanName,
+				fieldPath:     fmt.Sprintf(fmtStr, attrKey),
+				expectedValue: sentVal,
+				actualValue:   recdVal,
+			}
+			v.assertionFailures = append(v.assertionFailures, af)
+		}
+	}
+}
+
+func (v *CorrectnessTestValidator) compareKeyValueList(spanName string, sentKVList *otlpcommon.KeyValueList,
+	recdVal interface{}, fmtStr string, attrKey string) {
+	switch val := recdVal.(type) {
+	case *otlpcommon.KeyValueList:
+		v.diffAttributesSlice(spanName, val.Values, sentKVList.Values, fmtStr)
+	case string:
+		jsonStr := convertKVListToJSONString(sentKVList.Values)
+		v.compareSimpleValues(spanName, jsonStr, val, fmtStr, attrKey)
+	default:
+		af := &TraceAssertionFailure{
+			typeName:      "Span",
+			dataComboName: spanName,
+			fieldPath:     fmt.Sprintf(fmtStr, attrKey),
+			expectedValue: sentKVList,
+			actualValue:   recdVal,
+		}
+		v.assertionFailures = append(v.assertionFailures, af)
+	}
+}
+
+func (v *CorrectnessTestValidator) compareArrayList(spanName string, sentArray *otlpcommon.ArrayValue,
+	recdVal interface{}, fmtStr string, attrKey string) {
+	switch val := recdVal.(type) {
+	case *otlpcommon.ArrayValue:
+		v.compareSimpleValues(spanName, sentArray.Values, val.Values, fmtStr, attrKey)
+	case string:
+		jsonStr := convertArrayValuesToJSONString(sentArray.Values)
+		v.compareSimpleValues(spanName, jsonStr, val, fmtStr, attrKey)
+	default:
+		af := &TraceAssertionFailure{
+			typeName:      "Span",
+			dataComboName: spanName,
+			fieldPath:     fmt.Sprintf(fmtStr, attrKey),
+			expectedValue: sentArray,
+			actualValue:   recdVal,
+		}
+		v.assertionFailures = append(v.assertionFailures, af)
 	}
 }
 
@@ -469,7 +516,8 @@ func retrieveAttributeValue(attribute *otlpcommon.KeyValue) interface{} {
 	var attrVal interface{}
 	switch val := attribute.Value.Value.(type) {
 	case *otlpcommon.AnyValue_StringValue:
-		attrVal = val.StringValue
+		// Because of https://github.com/openzipkin/zipkin-go/pull/166 compare lower cases.
+		attrVal = strings.ToLower(val.StringValue)
 	case *otlpcommon.AnyValue_IntValue:
 		attrVal = val.IntValue
 	case *otlpcommon.AnyValue_DoubleValue:
@@ -508,7 +556,7 @@ func sortEventsByTimestamp(eventList []*otlptrace.Span_Event) {
 func convertLinksSliceToMap(links []*otlptrace.Span_Link) map[string]*otlptrace.Span_Link {
 	eventMap := make(map[string]*otlptrace.Span_Link)
 	for _, link := range links {
-		eventMap[hex.EncodeToString(link.SpanId)] = link
+		eventMap[link.SpanId.HexString()] = link
 	}
 	return eventMap
 }
@@ -521,4 +569,61 @@ func notWithinOneMillisecond(sentNs uint64, recdNs uint64) bool {
 		diff = recdNs - sentNs
 	}
 	return diff > uint64(1100000)
+}
+
+func convertKVListToJSONString(values []*otlpcommon.KeyValue) string {
+	jsonStr, err := json.Marshal(convertKVListToRawMap(values))
+	if err == nil {
+		return string(jsonStr)
+	}
+	return ""
+}
+
+func convertArrayValuesToJSONString(values []*otlpcommon.AnyValue) string {
+	jsonStr, err := json.Marshal(convertArrayValuesToRawSlice(values))
+	if err == nil {
+		return string(jsonStr)
+	}
+	return ""
+}
+
+func convertKVListToRawMap(values []*otlpcommon.KeyValue) map[string]interface{} {
+	rawMap := make(map[string]interface{})
+	for _, kv := range values {
+		var value *otlpcommon.AnyValue = kv.GetValue()
+		switch val := value.GetValue().(type) {
+		case *otlpcommon.AnyValue_StringValue:
+			rawMap[kv.Key] = val.StringValue
+		case *otlpcommon.AnyValue_IntValue:
+			rawMap[kv.Key] = val.IntValue
+		case *otlpcommon.AnyValue_DoubleValue:
+			rawMap[kv.Key] = val.DoubleValue
+		case *otlpcommon.AnyValue_BoolValue:
+			rawMap[kv.Key] = val.BoolValue
+		case *otlpcommon.AnyValue_KvlistValue:
+			rawMap[kv.Key] = convertKVListToRawMap(val.KvlistValue.Values)
+		case *otlpcommon.AnyValue_ArrayValue:
+			rawMap[kv.Key] = convertArrayValuesToRawSlice(val.ArrayValue.Values)
+		default:
+			rawMap[kv.Key] = val
+		}
+	}
+	return rawMap
+}
+
+func convertArrayValuesToRawSlice(values []*otlpcommon.AnyValue) []interface{} {
+	rawSlice := make([]interface{}, 0, len(values))
+	for _, v := range values {
+		switch val := v.GetValue().(type) {
+		case *otlpcommon.AnyValue_StringValue:
+			rawSlice = append(rawSlice, val.StringValue)
+		case *otlpcommon.AnyValue_IntValue:
+			rawSlice = append(rawSlice, val.IntValue)
+		case *otlpcommon.AnyValue_DoubleValue:
+			rawSlice = append(rawSlice, val.DoubleValue)
+		case *otlpcommon.AnyValue_BoolValue:
+			rawSlice = append(rawSlice, val.BoolValue)
+		}
+	}
+	return rawSlice
 }

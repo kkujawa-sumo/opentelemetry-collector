@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@ import (
 	"go.opencensus.io/tag"
 	"go.opentelemetry.io/collector/processor/samplingprocessor/tailsamplingprocessor/sampling"
 
-	"go.opentelemetry.io/collector/internal/collector/telemetry"
+	"go.opentelemetry.io/collector/config/configtelemetry"
 	"go.opentelemetry.io/collector/obsreport"
 )
 
@@ -46,8 +46,8 @@ var (
 )
 
 // SamplingProcessorMetricViews return the metrics views according to given telemetry level.
-func SamplingProcessorMetricViews(level telemetry.Level) []*view.View {
-	if level == telemetry.None {
+func SamplingProcessorMetricViews(level configtelemetry.Level) []*view.View {
+	if level == configtelemetry.LevelNone {
 		return nil
 	}
 

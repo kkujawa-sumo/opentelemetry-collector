@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,9 +26,9 @@ import (
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/internal/data/testdata"
-	"go.opentelemetry.io/collector/internal/processor/attraction"
+	"go.opentelemetry.io/collector/internal/processor/filterconfig"
 	"go.opentelemetry.io/collector/internal/processor/filterset"
-	"go.opentelemetry.io/collector/internal/processor/filterspan"
+	"go.opentelemetry.io/collector/processor/processorhelper"
 	"go.opentelemetry.io/collector/translator/conventions"
 )
 
@@ -138,13 +138,12 @@ func TestSpanProcessor_NilEmptyData(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	oCfg := cfg.(*Config)
-	oCfg.Settings.Actions = []attraction.ActionKeyValue{
-		{Key: "attribute1", Action: attraction.INSERT, Value: 123},
-		{Key: "attribute1", Action: attraction.DELETE},
+	oCfg.Settings.Actions = []processorhelper.ActionKeyValue{
+		{Key: "attribute1", Action: processorhelper.INSERT, Value: 123},
+		{Key: "attribute1", Action: processorhelper.DELETE},
 	}
 
-	tp, err := factory.CreateTraceProcessor(
-		context.Background(), component.ProcessorCreateParams{Logger: zap.NewNop()}, exportertest.NewNopTraceExporter(), oCfg)
+	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{Logger: zap.NewNop()}, oCfg, exportertest.NewNopTraceExporter())
 	require.Nil(t, err)
 	require.NotNil(t, tp)
 	for i := range testCases {
@@ -198,20 +197,20 @@ func TestAttributes_FilterSpans(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	oCfg := cfg.(*Config)
-	oCfg.Actions = []attraction.ActionKeyValue{
-		{Key: "attribute1", Action: attraction.INSERT, Value: 123},
+	oCfg.Actions = []processorhelper.ActionKeyValue{
+		{Key: "attribute1", Action: processorhelper.INSERT, Value: 123},
 	}
-	oCfg.Include = &filterspan.MatchProperties{
+	oCfg.Include = &filterconfig.MatchProperties{
 		Services: []string{"svcA", "svcB.*"},
 		Config:   *createConfig(filterset.Regexp),
 	}
-	oCfg.Exclude = &filterspan.MatchProperties{
-		Attributes: []filterspan.Attribute{
+	oCfg.Exclude = &filterconfig.MatchProperties{
+		Attributes: []filterconfig.Attribute{
 			{Key: "NoModification", Value: true},
 		},
 		Config: *createConfig(filterset.Strict),
 	}
-	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopTraceExporter(), cfg)
+	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopTraceExporter())
 	require.Nil(t, err)
 	require.NotNil(t, tp)
 
@@ -268,18 +267,18 @@ func TestAttributes_FilterSpansByNameStrict(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	oCfg := cfg.(*Config)
-	oCfg.Actions = []attraction.ActionKeyValue{
-		{Key: "attribute1", Action: attraction.INSERT, Value: 123},
+	oCfg.Actions = []processorhelper.ActionKeyValue{
+		{Key: "attribute1", Action: processorhelper.INSERT, Value: 123},
 	}
-	oCfg.Include = &filterspan.MatchProperties{
+	oCfg.Include = &filterconfig.MatchProperties{
 		SpanNames: []string{"apply", "dont_apply"},
 		Config:    *createConfig(filterset.Strict),
 	}
-	oCfg.Exclude = &filterspan.MatchProperties{
+	oCfg.Exclude = &filterconfig.MatchProperties{
 		SpanNames: []string{"dont_apply"},
 		Config:    *createConfig(filterset.Strict),
 	}
-	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopTraceExporter(), cfg)
+	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopTraceExporter())
 	require.Nil(t, err)
 	require.NotNil(t, tp)
 
@@ -336,18 +335,18 @@ func TestAttributes_FilterSpansByNameRegexp(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	oCfg := cfg.(*Config)
-	oCfg.Actions = []attraction.ActionKeyValue{
-		{Key: "attribute1", Action: attraction.INSERT, Value: 123},
+	oCfg.Actions = []processorhelper.ActionKeyValue{
+		{Key: "attribute1", Action: processorhelper.INSERT, Value: 123},
 	}
-	oCfg.Include = &filterspan.MatchProperties{
+	oCfg.Include = &filterconfig.MatchProperties{
 		SpanNames: []string{"^apply.*"},
 		Config:    *createConfig(filterset.Regexp),
 	}
-	oCfg.Exclude = &filterspan.MatchProperties{
+	oCfg.Exclude = &filterconfig.MatchProperties{
 		SpanNames: []string{".*dont_apply$"},
 		Config:    *createConfig(filterset.Regexp),
 	}
-	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopTraceExporter(), cfg)
+	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopTraceExporter())
 	require.Nil(t, err)
 	require.NotNil(t, tp)
 
@@ -399,14 +398,14 @@ func TestAttributes_Hash(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	oCfg := cfg.(*Config)
-	oCfg.Actions = []attraction.ActionKeyValue{
-		{Key: "user.email", Action: attraction.HASH},
-		{Key: "user.id", Action: attraction.HASH},
-		{Key: "user.balance", Action: attraction.HASH},
-		{Key: "user.authenticated", Action: attraction.HASH},
+	oCfg.Actions = []processorhelper.ActionKeyValue{
+		{Key: "user.email", Action: processorhelper.HASH},
+		{Key: "user.id", Action: processorhelper.HASH},
+		{Key: "user.balance", Action: processorhelper.HASH},
+		{Key: "user.authenticated", Action: processorhelper.HASH},
 	}
 
-	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopTraceExporter(), cfg)
+	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopTraceExporter())
 	require.Nil(t, err)
 	require.NotNil(t, tp)
 
@@ -444,13 +443,13 @@ func BenchmarkAttributes_FilterSpansByName(b *testing.B) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	oCfg := cfg.(*Config)
-	oCfg.Actions = []attraction.ActionKeyValue{
-		{Key: "attribute1", Action: attraction.INSERT, Value: 123},
+	oCfg.Actions = []processorhelper.ActionKeyValue{
+		{Key: "attribute1", Action: processorhelper.INSERT, Value: 123},
 	}
-	oCfg.Include = &filterspan.MatchProperties{
+	oCfg.Include = &filterconfig.MatchProperties{
 		SpanNames: []string{"^apply.*"},
 	}
-	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopTraceExporter(), cfg)
+	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopTraceExporter())
 	require.Nil(b, err)
 	require.NotNil(b, tp)
 

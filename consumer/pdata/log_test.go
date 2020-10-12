@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,11 @@ package pdata
 import (
 	"testing"
 
+	gogoproto "github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 
+	"go.opentelemetry.io/collector/internal"
+	otlpcollectorlogs "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/logs/v1"
 	otlplogs "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/logs/v1"
 )
 
@@ -46,13 +49,13 @@ func TestLogRecordCount(t *testing.T) {
 }
 
 func TestLogRecordCountWithNils(t *testing.T) {
-	assert.EqualValues(t, 0, LogsFromOtlp([]*otlplogs.ResourceLogs{nil, {}}).LogRecordCount())
-	assert.EqualValues(t, 0, LogsFromOtlp([]*otlplogs.ResourceLogs{
+	assert.EqualValues(t, 0, LogsFromInternalRep(internal.LogsFromOtlp([]*otlplogs.ResourceLogs{nil, {}})).LogRecordCount())
+	assert.EqualValues(t, 0, LogsFromInternalRep(internal.LogsFromOtlp([]*otlplogs.ResourceLogs{
 		{
 			InstrumentationLibraryLogs: []*otlplogs.InstrumentationLibraryLogs{nil, {}},
 		},
-	}).LogRecordCount())
-	assert.EqualValues(t, 2, LogsFromOtlp([]*otlplogs.ResourceLogs{
+	})).LogRecordCount())
+	assert.EqualValues(t, 2, LogsFromInternalRep(internal.LogsFromOtlp([]*otlplogs.ResourceLogs{
 		{
 			InstrumentationLibraryLogs: []*otlplogs.InstrumentationLibraryLogs{
 				{
@@ -60,12 +63,24 @@ func TestLogRecordCountWithNils(t *testing.T) {
 				},
 			},
 		},
-	}).LogRecordCount())
+	})).LogRecordCount())
 }
 
 func TestToFromLogProto(t *testing.T) {
 	otlp := []*otlplogs.ResourceLogs(nil)
-	td := LogsFromOtlp(otlp)
+	td := LogsFromInternalRep(internal.LogsFromOtlp(otlp))
 	assert.EqualValues(t, NewLogs(), td)
-	assert.EqualValues(t, otlp, LogsToOtlp(td))
+	assert.EqualValues(t, otlp, *td.orig)
+}
+
+func TestLogs_ToOtlpProtoBytes(t *testing.T) {
+	otlp := []*otlplogs.ResourceLogs(nil)
+	ld := LogsFromInternalRep(internal.LogsFromOtlp(otlp))
+	bytes, err := ld.ToOtlpProtoBytes()
+	assert.Nil(t, err)
+
+	elsr := otlpcollectorlogs.ExportLogsServiceRequest{}
+	err = gogoproto.Unmarshal(bytes, &elsr)
+	assert.Nil(t, err)
+	assert.EqualValues(t, elsr.ResourceLogs, *ld.orig)
 }

@@ -20,6 +20,7 @@ import (
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
+	"go.opentelemetry.io/collector/consumer/pdata"
 	"time"
 
 	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
@@ -175,7 +176,7 @@ func (cp *cascadingPolicy) OnLateArrivingSpans(earlyDecision Decision, spans []*
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (cp *cascadingPolicy) Evaluate(traceID []byte, trace *TraceData) (Decision, error) {
+func (cp *cascadingPolicy) Evaluate(traceID pdata.TraceID, trace *TraceData) (Decision, error) {
 	cp.logger.Debug("Evaluating spans in cascading filter")
 
 	currSecond := time.Now().Unix()
@@ -237,7 +238,7 @@ func recordSampled(ctx context.Context, consideredKey string, decision Decision)
 }
 
 // EvaluateSecondChance looks if more traces can be fit after initial decisions was made
-func (cp *cascadingPolicy) EvaluateSecondChance(traceID []byte, trace *TraceData) (Decision, error) {
+func (cp *cascadingPolicy) EvaluateSecondChance(_ pdata.TraceID, trace *TraceData) (Decision, error) {
 	// Lets keep it evaluated for the current batch second
 	sampled := cp.updateRate(cp.currentSecond, trace.SpanCount)
 	recordSampled(context.Background(), "second_chance", sampled)
@@ -246,7 +247,7 @@ func (cp *cascadingPolicy) EvaluateSecondChance(traceID []byte, trace *TraceData
 
 // OnDroppedSpans is called when the trace needs to be dropped, due to memory
 // pressure, before the decision_wait time has been reached.
-func (cp *cascadingPolicy) OnDroppedSpans(traceID []byte, trace *TraceData) (Decision, error) {
+func (cp *cascadingPolicy) OnDroppedSpans(_ pdata.TraceID, trace *TraceData) (Decision, error) {
 	cp.logger.Debug("Triggering action for dropped spans in cascading filter")
 	return NotSampled, nil
 }

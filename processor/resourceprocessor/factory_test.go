@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@ import (
 	"go.opentelemetry.io/collector/config/configcheck"
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/exporter/exportertest"
-	"go.opentelemetry.io/collector/internal/processor/attraction"
+	"go.opentelemetry.io/collector/processor/processorhelper"
 )
 
 func TestCreateDefaultConfig(t *testing.T) {
@@ -42,16 +42,16 @@ func TestCreateProcessor(t *testing.T) {
 			TypeVal: "resource",
 			NameVal: "resource",
 		},
-		AttributesActions: []attraction.ActionKeyValue{
-			{Key: "cloud.zone", Value: "zone-1", Action: attraction.UPSERT},
+		AttributesActions: []processorhelper.ActionKeyValue{
+			{Key: "cloud.zone", Value: "zone-1", Action: processorhelper.UPSERT},
 		},
 	}
 
-	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopTraceExporter(), cfg)
+	tp, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopTraceExporter())
 	assert.NoError(t, err)
 	assert.NotNil(t, tp)
 
-	mp, err := factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopMetricsExporter(), cfg)
+	mp, err := factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopMetricsExporter())
 	assert.NoError(t, err)
 	assert.NotNil(t, mp)
 }
@@ -60,10 +60,10 @@ func TestInvalidEmptyActions(t *testing.T) {
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig()
 
-	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopTraceExporter(), cfg)
+	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopTraceExporter())
 	assert.Error(t, err)
 
-	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, exportertest.NewNopMetricsExporter(), cfg)
+	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, exportertest.NewNopMetricsExporter())
 	assert.Error(t, err)
 }
 
@@ -74,15 +74,15 @@ func TestInvalidAttributeActions(t *testing.T) {
 			TypeVal: "resource",
 			NameVal: "resource",
 		},
-		AttributesActions: []attraction.ActionKeyValue{
+		AttributesActions: []processorhelper.ActionKeyValue{
 			{Key: "k", Value: "v", Action: "invalid-action"},
 		},
 	}
 
-	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, nil, cfg)
+	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, nil)
 	assert.Error(t, err)
 
-	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, nil, cfg)
+	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, cfg, nil)
 	assert.Error(t, err)
 }
 
@@ -109,9 +109,9 @@ func TestDeprecatedConfig(t *testing.T) {
 		Labels: map[string]string{
 			"cloud.zone": "zone-1",
 		},
-		AttributesActions: []attraction.ActionKeyValue{
-			{Key: "opencensus.resourcetype", Value: "host", Action: attraction.UPSERT},
-			{Key: "cloud.zone", Value: "zone-1", Action: attraction.UPSERT},
+		AttributesActions: []processorhelper.ActionKeyValue{
+			{Key: "opencensus.resourcetype", Value: "host", Action: processorhelper.UPSERT},
+			{Key: "cloud.zone", Value: "zone-1", Action: processorhelper.UPSERT},
 		},
 	}, cfg)
 }

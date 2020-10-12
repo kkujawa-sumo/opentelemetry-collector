@@ -15,6 +15,7 @@
 package sampling
 
 import (
+	"go.opentelemetry.io/collector/consumer/pdata"
 	"sync"
 	"testing"
 	"time"
@@ -97,38 +98,38 @@ func createCascadingEvaluator() PolicyEvaluator {
 func TestSampling(t *testing.T) {
 	cascading := createCascadingEvaluator()
 
-	decision, _ := cascading.Evaluate([]byte{0}, createTrace(8, 1000000))
+	decision, _ := cascading.Evaluate(pdata.NewTraceID([]byte{0}), createTrace(8, 1000000))
 	require.Equal(t, Sampled, decision)
 
-	decision, _ = cascading.Evaluate([]byte{1}, createTrace(8, 1000000))
+	decision, _ = cascading.Evaluate(pdata.NewTraceID([]byte{1}), createTrace(8, 1000000))
 	require.Equal(t, NotSampled, decision)
 }
 
 func TestSecondChanceEvaluation(t *testing.T) {
 	cascading := createCascadingEvaluator()
 
-	decision, _ := cascading.Evaluate([]byte{0}, createTrace(8, 1000))
+	decision, _ := cascading.Evaluate(pdata.NewTraceID([]byte{0}), createTrace(8, 1000))
 	require.Equal(t, SecondChance, decision)
 
-	decision, _ = cascading.Evaluate([]byte{1}, createTrace(8, 1000))
+	decision, _ = cascading.Evaluate(pdata.NewTraceID([]byte{1}), createTrace(8, 1000))
 	require.Equal(t, SecondChance, decision)
 
 	// This would never fit anyway
-	decision, _ = cascading.Evaluate([]byte{1}, createTrace(8000, 1000))
+	decision, _ = cascading.Evaluate(pdata.NewTraceID([]byte{1}), createTrace(8000, 1000))
 	require.Equal(t, NotSampled, decision)
 }
 
 func TestSecondChanceReevaluation(t *testing.T) {
 	cascading := createCascadingEvaluator()
 
-	decision, _ := cascading.EvaluateSecondChance([]byte{1}, createTrace(100, 1000))
+	decision, _ := cascading.EvaluateSecondChance(pdata.NewTraceID([]byte{1}), createTrace(100, 1000))
 	require.Equal(t, Sampled, decision)
 
 	// Too much
-	decision, _ = cascading.EvaluateSecondChance([]byte{1}, createTrace(1000, 1000))
+	decision, _ = cascading.EvaluateSecondChance(pdata.NewTraceID([]byte{1}), createTrace(1000, 1000))
 	require.Equal(t, NotSampled, decision)
 
 	// Just right
-	decision, _ = cascading.EvaluateSecondChance([]byte{1}, createTrace(900, 1000))
+	decision, _ = cascading.EvaluateSecondChance(pdata.NewTraceID([]byte{1}), createTrace(900, 1000))
 	require.Equal(t, Sampled, decision)
 }

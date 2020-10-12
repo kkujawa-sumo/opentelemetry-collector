@@ -1,10 +1,10 @@
-// Copyright 2020 The OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,10 +19,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.opentelemetry.io/collector/internal/collector/telemetry"
+	"go.opentelemetry.io/collector/config/configtelemetry"
 )
 
 func TestViews(t *testing.T) {
-	require.Greater(t, len(Views(telemetry.Basic)), 2)
-	require.Len(t, Views(telemetry.None), 0)
+	require.Greater(t, len(Views(configtelemetry.LevelBasic)), 2)
+	require.Len(t, Views(configtelemetry.LevelNone), 0)
 }

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,7 +59,7 @@ func (rs *ResourceSpec) isSpecified() bool {
 }
 
 // ChildProcess implements the OtelcolRunner interface as a child process on the same machine executing
-//the test. The process can be monitored and the output of which will be written to a log file.
+// the test. The process can be monitored and the output of which will be written to a log file.
 type ChildProcess struct {
 	// Descriptive name of the process
 	name string
@@ -114,10 +114,10 @@ type ChildProcess struct {
 }
 
 type StartParams struct {
-	name         string
-	logFilePath  string
-	cmd          string
-	cmdArgs      []string
+	Name         string
+	LogFilePath  string
+	Cmd          string
+	CmdArgs      []string
 	resourceSpec *ResourceSpec
 }
 
@@ -167,23 +167,23 @@ func (cp *ChildProcess) PrepareConfig(configStr string) (configCleanup func(), e
 // cmdArgs is the command line arguments to pass to the process.
 func (cp *ChildProcess) Start(params StartParams) (receiverAddr string, err error) {
 
-	cp.name = params.name
+	cp.name = params.Name
 	cp.doneSignal = make(chan struct{})
 	cp.resourceSpec = params.resourceSpec
 
-	log.Printf("Starting %s (%s)", cp.name, params.cmd)
+	log.Printf("Starting %s (%s)", cp.name, params.Cmd)
 
 	// Prepare log file
 	var logFile *os.File
-	logFile, err = os.Create(params.logFilePath)
+	logFile, err = os.Create(params.LogFilePath)
 	if err != nil {
-		return receiverAddr, fmt.Errorf("cannot create %s: %s", params.logFilePath, err.Error())
+		return receiverAddr, fmt.Errorf("cannot create %s: %s", params.LogFilePath, err.Error())
 	}
-	log.Printf("Writing %s log to %s", cp.name, params.logFilePath)
+	log.Printf("Writing %s log to %s", cp.name, params.LogFilePath)
 
 	// Prepare to start the process.
 	// #nosec
-	args := params.cmdArgs
+	args := params.CmdArgs
 	if !containsConfig(args) {
 		if cp.configFileName == "" {
 			configFile := path.Join("testdata", "agent-config.yaml")
@@ -195,21 +195,21 @@ func (cp *ChildProcess) Start(params StartParams) (receiverAddr string, err erro
 		args = append(args, "--config")
 		args = append(args, cp.configFileName)
 	}
-	cp.cmd = exec.Command(params.cmd, args...)
+	cp.cmd = exec.Command(params.Cmd, args...)
 
 	// Capture standard output and standard error.
 	stdoutIn, err := cp.cmd.StdoutPipe()
 	if err != nil {
-		return receiverAddr, fmt.Errorf("cannot capture stdout of %s: %s", params.cmd, err.Error())
+		return receiverAddr, fmt.Errorf("cannot capture stdout of %s: %s", params.Cmd, err.Error())
 	}
 	stderrIn, err := cp.cmd.StderrPipe()
 	if err != nil {
-		return receiverAddr, fmt.Errorf("cannot capture stderr of %s: %s", params.cmd, err.Error())
+		return receiverAddr, fmt.Errorf("cannot capture stderr of %s: %s", params.Cmd, err.Error())
 	}
 
 	// Start the process.
 	if err = cp.cmd.Start(); err != nil {
-		return receiverAddr, fmt.Errorf("cannot start executable at %s: %s", params.cmd, err.Error())
+		return receiverAddr, fmt.Errorf("cannot start executable at %s: %s", params.Cmd, err.Error())
 	}
 
 	cp.startTime = time.Now()
@@ -411,8 +411,8 @@ func (cp *ChildProcess) checkAllowedResourceUsage() error {
 
 	// Check if current RAM usage exceeds expected.
 	if cp.resourceSpec.ExpectedMaxRAM != 0 && cp.ramMiBCur.Load() > cp.resourceSpec.ExpectedMaxRAM {
-		errMsg = fmt.Sprintf("RAM consumption is %d MiB, max expected is %d MiB",
-			cp.ramMiBCur, cp.resourceSpec.ExpectedMaxRAM)
+		errMsg = fmt.Sprintf("RAM consumption is %s MiB, max expected is %d MiB",
+			cp.ramMiBCur.String(), cp.resourceSpec.ExpectedMaxRAM)
 	}
 
 	if errMsg == "" {

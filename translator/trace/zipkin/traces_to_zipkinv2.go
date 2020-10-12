@@ -1,10 +1,10 @@
-// Copyright 2020, OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,6 @@ import (
 	zipkinmodel "github.com/openzipkin/zipkin-go/model"
 
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/internal"
 	"go.opentelemetry.io/collector/translator/conventions"
 	tracetranslator "go.opentelemetry.io/collector/translator/trace"
 )
@@ -112,7 +111,7 @@ func spanToZipkinSpan(
 
 	zs := &zipkinmodel.SpanModel{}
 
-	hi, lo, err := tracetranslator.BytesToUInt64TraceID(span.TraceID().Bytes())
+	hi, lo, err := tracetranslator.TraceIDToUInt64Pair(span.TraceID())
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +141,7 @@ func spanToZipkinSpan(
 
 	zs.Sampled = &sampled
 	zs.Name = span.Name()
-	zs.Timestamp = internal.UnixNanoToTime(span.StartTime())
+	zs.Timestamp = pdata.UnixNanoToTime(span.StartTime())
 	if span.EndTime() != 0 {
 		zs.Duration = time.Duration(span.EndTime() - span.StartTime())
 	}
@@ -202,17 +201,16 @@ func spanEventsToZipkinAnnotations(events pdata.SpanEventSlice, zs *zipkinmodel.
 			}
 			if event.Attributes().Len() == 0 && event.DroppedAttributesCount() == 0 {
 				zAnnos[i] = zipkinmodel.Annotation{
-					Timestamp: internal.UnixNanoToTime(event.Timestamp()),
+					Timestamp: pdata.UnixNanoToTime(event.Timestamp()),
 					Value:     event.Name(),
 				}
 			} else {
-				rawMap := attributeMapToMap(event.Attributes())
-				jsonStr, err := json.Marshal(rawMap)
+				jsonStr, err := json.Marshal(tracetranslator.AttributeMapToMap(event.Attributes()))
 				if err != nil {
 					return err
 				}
 				zAnnos[i] = zipkinmodel.Annotation{
-					Timestamp: internal.UnixNanoToTime(event.Timestamp()),
+					Timestamp: pdata.UnixNanoToTime(event.Timestamp()),
 					Value: fmt.Sprintf(tracetranslator.SpanEventDataFormat, event.Name(), jsonStr,
 						event.DroppedAttributesCount()),
 				}
@@ -228,52 +226,21 @@ func spanLinksToZipkinTags(links pdata.SpanLinkSlice, zTags map[string]string) e
 		link := links.At(i)
 		if !link.IsNil() {
 			key := fmt.Sprintf("otlp.link.%d", i)
-			rawMap := attributeMapToMap(link.Attributes())
-			jsonStr, err := json.Marshal(rawMap)
+			jsonStr, err := json.Marshal(tracetranslator.AttributeMapToMap(link.Attributes()))
 			if err != nil {
 				return err
 			}
-			zTags[key] = fmt.Sprintf(tracetranslator.SpanLinkDataFormat, link.TraceID().String(),
-				link.SpanID().String(), link.TraceState(), jsonStr, link.DroppedAttributesCount())
+			zTags[key] = fmt.Sprintf(tracetranslator.SpanLinkDataFormat, link.TraceID().HexString(),
+				link.SpanID().HexString(), link.TraceState(), jsonStr, link.DroppedAttributesCount())
 		}
 	}
 	return nil
 }
 
-func attributeMapToMap(attrMap pdata.AttributeMap) map[string]interface{} {
-	rawMap := make(map[string]interface{})
-	attrMap.ForEach(func(k string, v pdata.AttributeValue) {
-		switch v.Type() {
-		case pdata.AttributeValueSTRING:
-			rawMap[k] = v.StringVal()
-		case pdata.AttributeValueINT:
-			rawMap[k] = v.IntVal()
-		case pdata.AttributeValueDOUBLE:
-			rawMap[k] = v.DoubleVal()
-		case pdata.AttributeValueBOOL:
-			rawMap[k] = v.BoolVal()
-		case pdata.AttributeValueNULL:
-			rawMap[k] = nil
-		}
-	})
-	return rawMap
-}
-
 func attributeMapToStringMap(attrMap pdata.AttributeMap) map[string]string {
 	rawMap := make(map[string]string)
 	attrMap.ForEach(func(k string, v pdata.AttributeValue) {
-		switch v.Type() {
-		case pdata.AttributeValueSTRING:
-			rawMap[k] = v.StringVal()
-		case pdata.AttributeValueINT:
-			rawMap[k] = strconv.FormatInt(v.IntVal(), 10)
-		case pdata.AttributeValueDOUBLE:
-			rawMap[k] = strconv.FormatFloat(v.DoubleVal(), 'f', -1, 64)
-		case pdata.AttributeValueBOOL:
-			rawMap[k] = strconv.FormatBool(v.BoolVal())
-		case pdata.AttributeValueNULL:
-			rawMap[k] = ""
-		}
+		rawMap[k] = tracetranslator.AttributeValueToString(v, false)
 	})
 	return rawMap
 }

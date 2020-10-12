@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ package service
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -26,7 +27,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +38,6 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/configmodels"
-	"go.opentelemetry.io/collector/internal/version"
 	"go.opentelemetry.io/collector/service/defaultcomponents"
 	"go.opentelemetry.io/collector/testutil"
 )
@@ -53,7 +52,7 @@ func TestApplication_Start(t *testing.T) {
 		return nil
 	}
 
-	app, err := New(Parameters{Factories: factories, ApplicationStartInfo: ApplicationStartInfo{}, LoggingHooks: []func(entry zapcore.Entry) error{hook}})
+	app, err := New(Parameters{Factories: factories, ApplicationStartInfo: componenttest.TestApplicationStartInfo(), LoggingHooks: []func(entry zapcore.Entry) error{hook}})
 	require.NoError(t, err)
 	assert.Equal(t, app.rootCmd, app.Command())
 
@@ -68,7 +67,7 @@ func TestApplication_Start(t *testing.T) {
 	appDone := make(chan struct{})
 	go func() {
 		defer close(appDone)
-		assert.NoError(t, app.Start())
+		assert.NoError(t, app.Run())
 	}()
 
 	assert.Equal(t, Starting, <-app.GetStateChannel())
@@ -113,7 +112,7 @@ func TestApplication_ReportError(t *testing.T) {
 	factories, err := defaultcomponents.Components()
 	require.NoError(t, err)
 
-	app, err := New(Parameters{Factories: factories, ApplicationStartInfo: ApplicationStartInfo{}})
+	app, err := New(Parameters{Factories: factories, ApplicationStartInfo: componenttest.TestApplicationStartInfo()})
 	require.NoError(t, err)
 
 	app.rootCmd.SetArgs([]string{"--config=testdata/otelcol-config-minimal.yaml"})
@@ -121,7 +120,7 @@ func TestApplication_ReportError(t *testing.T) {
 	appDone := make(chan struct{})
 	go func() {
 		defer close(appDone)
-		assert.EqualError(t, app.Start(), "failed to shutdown extensions: err1")
+		assert.EqualError(t, app.Run(), "failed to shutdown extensions: err1")
 	}()
 
 	assert.Equal(t, Starting, <-app.GetStateChannel())
@@ -137,12 +136,7 @@ func TestApplication_StartAsGoRoutine(t *testing.T) {
 	require.NoError(t, err)
 
 	params := Parameters{
-		ApplicationStartInfo: ApplicationStartInfo{
-			ExeName:  "otelcol",
-			LongName: "InProcess Collector",
-			Version:  version.Version,
-			GitHash:  version.GitHash,
-		},
+		ApplicationStartInfo: componenttest.TestApplicationStartInfo(),
 		ConfigFactory: func(v *viper.Viper, factories component.Factories) (*configmodels.Config, error) {
 			return constructMimumalOpConfig(t, factories), nil
 		},
@@ -157,7 +151,7 @@ func TestApplication_StartAsGoRoutine(t *testing.T) {
 	appDone := make(chan struct{})
 	go func() {
 		defer close(appDone)
-		appErr := app.Start()
+		appErr := app.Run()
 		if appErr != nil {
 			err = appErr
 		}
@@ -354,13 +348,13 @@ func TestApplication_GetFactory(t *testing.T) {
 	exampleExtensionFactory := &componenttest.ExampleExtensionFactory{}
 
 	factories := component.Factories{
-		Receivers: map[configmodels.Type]component.ReceiverFactoryBase{
+		Receivers: map[configmodels.Type]component.ReceiverFactory{
 			exampleReceiverFactory.Type(): exampleReceiverFactory,
 		},
-		Processors: map[configmodels.Type]component.ProcessorFactoryBase{
+		Processors: map[configmodels.Type]component.ProcessorFactory{
 			exampleProcessorFactory.Type(): exampleProcessorFactory,
 		},
-		Exporters: map[configmodels.Type]component.ExporterFactoryBase{
+		Exporters: map[configmodels.Type]component.ExporterFactory{
 			exampleExporterFactory.Type(): exampleExporterFactory,
 		},
 		Extensions: map[configmodels.Type]component.ExtensionFactory{
@@ -402,13 +396,13 @@ func createExampleApplication(t *testing.T) *Application {
 	exampleExporterFactory := &componenttest.ExampleExporterFactory{}
 	exampleExtensionFactory := &componenttest.ExampleExtensionFactory{}
 	factories := component.Factories{
-		Receivers: map[configmodels.Type]component.ReceiverFactoryBase{
+		Receivers: map[configmodels.Type]component.ReceiverFactory{
 			exampleReceiverFactory.Type(): exampleReceiverFactory,
 		},
-		Processors: map[configmodels.Type]component.ProcessorFactoryBase{
+		Processors: map[configmodels.Type]component.ProcessorFactory{
 			exampleProcessorFactory.Type(): exampleProcessorFactory,
 		},
-		Exporters: map[configmodels.Type]component.ExporterFactoryBase{
+		Exporters: map[configmodels.Type]component.ExporterFactory{
 			exampleExporterFactory.Type(): exampleExporterFactory,
 		},
 		Extensions: map[configmodels.Type]component.ExtensionFactory{
@@ -455,7 +449,7 @@ func TestApplication_GetExtensions(t *testing.T) {
 	appDone := make(chan struct{})
 	go func() {
 		defer close(appDone)
-		assert.NoError(t, app.Start())
+		assert.NoError(t, app.Run())
 	}()
 
 	assert.Equal(t, Starting, <-app.GetStateChannel())
@@ -484,7 +478,7 @@ func TestApplication_GetExporters(t *testing.T) {
 	appDone := make(chan struct{})
 	go func() {
 		defer close(appDone)
-		assert.NoError(t, app.Start())
+		assert.NoError(t, app.Run())
 	}()
 
 	assert.Equal(t, Starting, <-app.GetStateChannel())

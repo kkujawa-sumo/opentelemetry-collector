@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,19 +23,17 @@ import (
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
-	"github.com/golang/protobuf/ptypes/timestamp"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
-	"go.opencensus.io/plugin/ochttp"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/tag"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumerdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
 	"go.opentelemetry.io/collector/obsreport"
+	"go.opentelemetry.io/collector/translator/internaldata"
 )
 
 const (
@@ -69,6 +67,7 @@ type transaction struct {
 	receiverName         string
 	ms                   MetadataService
 	node                 *commonpb.Node
+	resource             *resourcepb.Resource
 	metricBuilder        *metricBuilder
 	logger               *zap.Logger
 }
@@ -134,7 +133,7 @@ func (tr *transaction) initTransaction(ls labels.Labels) error {
 		tr.job = job
 		tr.instance = instance
 	}
-	tr.node = createNode(job, instance, mc.SharedLabels().Get(model.SchemeLabel))
+	tr.node, tr.resource = createNodeAndResource(job, instance, mc.SharedLabels().Get(model.SchemeLabel))
 	tr.metricBuilder = newMetricBuilder(mc, tr.useStartTimeMetric, tr.startTimeMetricRegex, tr.logger)
 	tr.isNew = false
 	return nil
@@ -157,14 +156,6 @@ func (tr *transaction) Commit() error {
 		return err
 	}
 
-	if tr.metricBuilder.hasInternalMetric {
-		m := ochttp.ClientRoundtripLatency.M(tr.metricBuilder.scrapeLatencyMs)
-		stats.RecordWithTags(tr.ctx, []tag.Mutator{
-			tag.Upsert(ochttp.KeyClientStatus, tr.metricBuilder.scrapeStatus),
-		}, m)
-
-	}
-
 	if tr.useStartTimeMetric {
 		// AdjustStartTime - startTime has to be non-zero in this case.
 		if tr.metricBuilder.startTime == 0.0 {
@@ -181,11 +172,12 @@ func (tr *transaction) Commit() error {
 	numPoints := 0
 	if len(metrics) > 0 {
 		md := consumerdata.MetricsData{
-			Node:    tr.node,
-			Metrics: metrics,
+			Node:     tr.node,
+			Resource: tr.resource,
+			Metrics:  metrics,
 		}
 		numTimeseries, numPoints = obsreport.CountMetricPoints(md)
-		err = tr.sink.ConsumeMetrics(ctx, pdatautil.MetricsFromMetricsData([]consumerdata.MetricsData{md}))
+		err = tr.sink.ConsumeMetrics(ctx, internaldata.OCToMetrics(md))
 	}
 	obsreport.EndMetricsReceiveOp(
 		ctx, dataformat, numPoints, numTimeseries, err)
@@ -210,29 +202,32 @@ func adjustStartTime(startTime float64, metrics []*metricspb.Metric) {
 	}
 }
 
-func timestampFromFloat64(ts float64) *timestamp.Timestamp {
+func timestampFromFloat64(ts float64) *timestamppb.Timestamp {
 	secs := int64(ts)
 	nanos := int64((ts - float64(secs)) * 1e9)
-	return &timestamp.Timestamp{
+	return &timestamppb.Timestamp{
 		Seconds: secs,
 		Nanos:   int32(nanos),
 	}
 }
 
-func createNode(job, instance, scheme string) *commonpb.Node {
+func createNodeAndResource(job, instance, scheme string) (*commonpb.Node, *resourcepb.Resource) {
 	splitted := strings.Split(instance, ":")
 	host, port := splitted[0], "80"
 	if len(splitted) >= 2 {
 		port = splitted[1]
 	}
-	return &commonpb.Node{
+	node := &commonpb.Node{
 		ServiceInfo: &commonpb.ServiceInfo{Name: job},
 		Identifier: &commonpb.ProcessIdentifier{
 			HostName: host,
 		},
-		Attributes: map[string]string{
+	}
+	resource := &resourcepb.Resource{
+		Labels: map[string]string{
 			portAttr:   port,
 			schemeAttr: scheme,
 		},
 	}
+	return node, resource
 }

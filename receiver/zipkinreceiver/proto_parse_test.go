@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto" //lint:ignore SA1019 golang/protobuf/proto is deprecated
-	zipkin_proto3 "github.com/openzipkin/zipkin-go/proto/v2"
+	"github.com/openzipkin/zipkin-go/proto/zipkin_proto3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"go.opentelemetry.io/collector/consumer/pdata"
 	otlpcommon "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/common/v1"
@@ -127,9 +127,9 @@ func TestConvertSpansToTraceSpans_protobuf(t *testing.T) {
 				{
 					Spans: []*otlptrace.Span{
 						{
-							TraceId:           []byte{0x7F, 0x6F, 0x5F, 0x4F, 0x3F, 0x2F, 0x1F, 0x0F, 0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0},
-							SpanId:            []byte{0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0},
-							ParentSpanId:      []byte{0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0},
+							TraceId:           otlpcommon.NewTraceID([]byte{0x7F, 0x6F, 0x5F, 0x4F, 0x3F, 0x2F, 0x1F, 0x0F, 0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0}),
+							SpanId:            otlpcommon.NewSpanID([]byte{0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0}),
+							ParentSpanId:      otlpcommon.NewSpanID([]byte{0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0}),
 							Name:              "ProtoSpan1",
 							StartTimeUnixNano: uint64(now.UnixNano()),
 							EndTimeUnixNano:   uint64(now.Add(12 * time.Second).UnixNano()),
@@ -205,9 +205,9 @@ func TestConvertSpansToTraceSpans_protobuf(t *testing.T) {
 				{
 					Spans: []*otlptrace.Span{
 						{
-							TraceId:           []byte{0x7A, 0x6A, 0x5A, 0x4A, 0x3A, 0x2A, 0x1A, 0x0A, 0xC7, 0xC6, 0xC5, 0xC4, 0xC3, 0xC2, 0xC1, 0xC0},
-							SpanId:            []byte{0x67, 0x66, 0x65, 0x64, 0x63, 0x62, 0x61, 0x60},
-							ParentSpanId:      []byte{0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10},
+							TraceId:           otlpcommon.NewTraceID([]byte{0x7A, 0x6A, 0x5A, 0x4A, 0x3A, 0x2A, 0x1A, 0x0A, 0xC7, 0xC6, 0xC5, 0xC4, 0xC3, 0xC2, 0xC1, 0xC0}),
+							SpanId:            otlpcommon.NewSpanID([]byte{0x67, 0x66, 0x65, 0x64, 0x63, 0x62, 0x61, 0x60}),
+							ParentSpanId:      otlpcommon.NewSpanID([]byte{0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10}),
 							Name:              "CacheWarmUp",
 							StartTimeUnixNano: uint64(now.Add(-10 * time.Hour).UnixNano()),
 							EndTimeUnixNano:   uint64(now.Add(-10 * time.Hour).Add(7 * time.Second).UnixNano()),

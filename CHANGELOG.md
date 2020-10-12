@@ -2,6 +2,119 @@
 
 ## Unreleased
 
+## v0.12.0 Beta
+
+## 🚀 New components 🚀
+
+- `configauth` package with the auth settings that can be used by receivers (#1807, #1808, #1809, #1810)
+- `perfcounters` package that uses perflib for host metrics receiver (#1835, #1836, #1868, #1869, #1870)
+
+## 💡 Enhancements 💡
+
+- Remove `queued_retry` and enable `otlp` metrics receiver in default config (#1823, #1838)
+- Add `limit_percentage` and `spike_limit_percentage` options to `memorylimiter` processor (#1622)
+- `hostmetrics` receiver:
+  - Collect additional labels from partitions in the filesystems scraper (#1858)
+  - Add filters for mount point and filesystem type (#1866)
+- Add cloud.provider semantic conventions (#1865)
+- `attribute` processor: Add log support (#1783)
+- Deprecate OpenCensus-based internal data structures (#1843)
+- Introduce SpanID data type, not yet used in Protobuf messages ($1854, #1855)
+- Enable `otlp` trace by default in the released docker image (#1883)
+- `tailsampling` processor: Combine batches of spans into a single batch (#1864)
+- `filter` processor: Update to use pdata (#1885)
+- Allow MSI upgrades (#1914)
+
+## 🧰 Bug fixes 🧰
+
+- `prometheus` receiver: Print a more informative message about 'up' metric value (#1826)
+- Use custom data type and custom JSON serialization for traceid (#1840)
+- Skip creation of redundant nil resource in translation from OC if there are no combined metrics (#1803)
+- `tailsampling` processor: Only send to next consumer once (#1735)
+- Report Windows pagefile usage in bytes (#1837)
+- Fix issue where Prometheus SD config cannot be parsed (#1877)
+
+## v0.11.0 Beta
+
+## 🛑 Breaking changes 🛑
+
+- Rename service.Start() to Run() since it's a blocking call
+- Fix slice Append to accept by value the element in pdata
+- Change CreateTraceProcessor and CreateMetricsProcessor to use the same parameter order as receivers/logs processor and exporters.
+- Prevent accidental use of LogsToOtlp and LogsFromOtlp and the OTLP data structs (#1703)
+- Remove SetType from configmodels, ensure all registered factories set the type in config (#1798)
+- Move process telemetry to service/internal (#1794)
+
+## 💡 Enhancements 💡
+
+- Add map and array attribute value type support (#1656)
+- Add authentication support to kafka (#1632)
+- Implement InstrumentationLibrary translation to jaeger (#1645)
+- Add public functions to export pdata to ExportXServicesRequest Protobuf bytes (#1741)
+- Expose telemetry level in the configtelemetry (#1796)
+- Add configauth package (#1807)
+- Add config to docker image (#1792)
+
+## 🧰 Bug fixes 🧰
+
+- Use zap int argument for int values instead of conversion (#1779)
+- Add support for gzip encoded payload in OTLP/HTTP receiver (#1581)
+- Return proto status for OTLP receiver when failed (#1788)
+
+## v0.10.0 Beta
+
+## 🛑 Breaking changes 🛑
+
+- **Update OTLP to v0.5.0, incompatible metrics protocol.**
+- Remove support for propagating summary metrics in OtelCollector.
+  - This is a temporary change, and will affect mostly OpenCensus users who use metrics.
+
+## 💡 Enhancements 💡
+- Support zipkin proto in `kafka` receiver (#1646)
+- Prometheus Remote Write Exporter supporting Cortex (#1577, #1643)
+- Add deployment environment semantic convention (#1722)
+- Add logs support to `batch` and `resource` processors (#1723, #1729)
+
+## 🧰 Bug fixes 🧰
+- Identify config error when expected map is other value type (#1641)
+- Fix Kafka receiver closing ready channel multiple times (#1696)
+- Fix a panic issue while processing Zipkin spans with an empty service name (#1742)
+- Zipkin Receiver: Always set the endtime (#1750)
+
+## v0.9.0 Beta
+
+## 🛑 Breaking changes 🛑
+
+- **Remove old base factories**:
+  - `ReceiverFactoryBase` (#1583)
+  - `ProcessorFactoryBase` (#1596)
+  - `ExporterFactoryBase` (#1630)
+- Remove logs factories and merge with normal factories (#1569)
+- Remove `reconnection_delay` from OpenCensus exporter (#1516)
+- Remove `ConsumerOld` interfaces (#1631)
+
+## 🚀 New components 🚀
+- `prometheusremotewrite` exporter: Send metrics data in Prometheus TimeSeries format to Cortex or any Prometheus (#1544)
+- `kafka` receiver: Receive traces from Kafka (#1410)
+
+## 💡 Enhancements 💡
+- `kafka` exporter: Enable queueing, retry, timeout (#1455)
+- Add `Headers` field in HTTPClientSettings (#1552)
+- Change OpenCensus receiver (#1556) and exporter (#1571) to the new interfaces
+- Add semantic attribute for `telemetry.auto.version` (#1578)
+- Add uptime and RSS memory self-observability metrics (#1549)
+- Support conversion for OpenCensus `SameProcessAsParentSpan` (#1629)
+- Access application version in components (#1559)
+- Make Kafka payload encoding configurable (#1584)
+
+## 🧰 Bug fixes 🧰
+- Stop further processing if `filterprocessor` filters all data (#1500)
+- `processscraper`: Use same scrape time for all data points coming from same process (#1539)
+- Ensure that time conversion for 0 returns nil timestamps or Time where IsZero returns true (#1550)
+- Fix multiple exporters panic (#1563)
+- Allow `attribute` processor for external use (#1574)
+- Do not duplicate filesystem metrics for devices with many mount points (#1617)
+
 ## v0.8.0 Beta
 
 ## 🚀 New components 🚀

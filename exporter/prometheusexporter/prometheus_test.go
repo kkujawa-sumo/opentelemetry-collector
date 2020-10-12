@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,14 +23,14 @@ import (
 	"testing"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer/consumerdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
+	"go.opentelemetry.io/collector/translator/internaldata"
 )
 
 func TestPrometheusExporter(t *testing.T) {
@@ -98,7 +98,7 @@ func TestPrometheusExporter_endToEnd(t *testing.T) {
 	assert.NotNil(t, exp)
 
 	for delta := 0; delta <= 20; delta += 10 {
-		md := pdatautil.MetricsFromMetricsData([]consumerdata.MetricsData{{Metrics: metricBuilder(int64(delta))}})
+		md := internaldata.OCToMetrics(consumerdata.MetricsData{Metrics: metricBuilder(int64(delta))})
 		assert.NoError(t, exp.ConsumeMetrics(context.Background(), md))
 
 		res, err := http.Get("http://localhost:7777/metrics")
@@ -132,24 +132,21 @@ func metricBuilder(delta int64) []*metricspb.Metric {
 				Description: "Extra ones",
 				Unit:        "1",
 				Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
-				LabelKeys: []*metricspb.LabelKey{
-					{Key: "os", Description: "Operating system"},
-					{Key: "arch", Description: "Architecture"},
-				},
+				LabelKeys:   []*metricspb.LabelKey{{Key: "os"}, {Key: "arch"}},
 			},
 			Timeseries: []*metricspb.TimeSeries{
 				{
-					StartTimestamp: &timestamp.Timestamp{
+					StartTimestamp: &timestamppb.Timestamp{
 						Seconds: 1543160298,
 						Nanos:   100000090,
 					},
 					LabelValues: []*metricspb.LabelValue{
-						{Value: "windows"},
-						{Value: "x86"},
+						{Value: "windows", HasValue: true},
+						{Value: "x86", HasValue: true},
 					},
 					Points: []*metricspb.Point{
 						{
-							Timestamp: &timestamp.Timestamp{
+							Timestamp: &timestamppb.Timestamp{
 								Seconds: 1543160298,
 								Nanos:   100000997,
 							},
@@ -167,24 +164,21 @@ func metricBuilder(delta int64) []*metricspb.Metric {
 				Description: "Extra ones",
 				Unit:        "1",
 				Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
-				LabelKeys: []*metricspb.LabelKey{
-					{Key: "os", Description: "Operating system"},
-					{Key: "arch", Description: "Architecture"},
-				},
+				LabelKeys:   []*metricspb.LabelKey{{Key: "os"}, {Key: "arch"}},
 			},
 			Timeseries: []*metricspb.TimeSeries{
 				{
-					StartTimestamp: &timestamp.Timestamp{
+					StartTimestamp: &timestamppb.Timestamp{
 						Seconds: 1543160298,
 						Nanos:   100000090,
 					},
 					LabelValues: []*metricspb.LabelValue{
-						{Value: "linux"},
-						{Value: "x86"},
+						{Value: "linux", HasValue: true},
+						{Value: "x86", HasValue: true},
 					},
 					Points: []*metricspb.Point{
 						{
-							Timestamp: &timestamp.Timestamp{
+							Timestamp: &timestamppb.Timestamp{
 								Seconds: 1543160298,
 								Nanos:   100000997,
 							},

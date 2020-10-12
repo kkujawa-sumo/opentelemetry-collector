@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,8 @@
 package jaeger
 
 import (
+	"io"
+	"math/rand"
 	"testing"
 
 	"github.com/jaegertracing/jaeger/model"
@@ -24,6 +26,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/pdata"
 	otlptrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/trace/v1"
 	"go.opentelemetry.io/collector/internal/data/testdata"
+	"go.opentelemetry.io/collector/internal/goldendataset"
 	"go.opentelemetry.io/collector/translator/conventions"
 	tracetranslator "go.opentelemetry.io/collector/translator/trace"
 )
@@ -36,30 +39,30 @@ func TestGetTagFromStatusCode(t *testing.T) {
 	}{
 		{
 			name: "ok",
-			code: pdata.StatusCode(otlptrace.Status_Ok),
+			code: pdata.StatusCodeOk,
 			tag: model.KeyValue{
 				Key:    tracetranslator.TagStatusCode,
-				VInt64: int64(otlptrace.Status_Ok),
+				VInt64: int64(pdata.StatusCodeOk),
 				VType:  model.ValueType_INT64,
 			},
 		},
 
 		{
 			name: "unknown",
-			code: pdata.StatusCode(otlptrace.Status_UnknownError),
+			code: pdata.StatusCodeUnknownError,
 			tag: model.KeyValue{
 				Key:    tracetranslator.TagStatusCode,
-				VInt64: int64(otlptrace.Status_UnknownError),
+				VInt64: int64(pdata.StatusCodeUnknownError),
 				VType:  model.ValueType_INT64,
 			},
 		},
 
 		{
 			name: "not-found",
-			code: pdata.StatusCode(otlptrace.Status_NotFound),
+			code: pdata.StatusCodeNotFound,
 			tag: model.KeyValue{
 				Key:    tracetranslator.TagStatusCode,
-				VInt64: int64(otlptrace.Status_NotFound),
+				VInt64: int64(pdata.StatusCodeNotFound),
 				VType:  model.ValueType_INT64,
 			},
 		},
@@ -81,14 +84,14 @@ func TestGetErrorTagFromStatusCode(t *testing.T) {
 		VType: model.ValueType_BOOL,
 	}
 
-	_, ok := getErrorTagFromStatusCode(pdata.StatusCode(otlptrace.Status_Ok))
+	_, ok := getErrorTagFromStatusCode(pdata.StatusCodeOk)
 	assert.False(t, ok)
 
-	got, ok := getErrorTagFromStatusCode(pdata.StatusCode(otlptrace.Status_UnknownError))
+	got, ok := getErrorTagFromStatusCode(pdata.StatusCodeUnknownError)
 	assert.True(t, ok)
 	assert.EqualValues(t, errTag, got)
 
-	got, ok = getErrorTagFromStatusCode(pdata.StatusCode(otlptrace.Status_NotFound))
+	got, ok = getErrorTagFromStatusCode(pdata.StatusCodeNotFound)
 	assert.True(t, ok)
 	assert.EqualValues(t, errTag, got)
 }
@@ -278,6 +281,19 @@ func TestInternalTracesToJaegerProto(t *testing.T) {
 			err: nil,
 		},
 		{
+			name: "library-info",
+			td:   generateTraceDataWithLibraryInfo(),
+			jb: model.Batch{
+				Process: &model.Process{
+					ServiceName: tracetranslator.ResourceNotSet,
+				},
+				Spans: []*model.Span{
+					generateProtoSpanWithLibraryInfo("io.opentelemetry.test"),
+				},
+			},
+			err: nil,
+		},
+		{
 			name: "two-spans-child-parent",
 			td:   generateTraceDataTwoSpansChildParent(),
 			jb: model.Batch{
@@ -319,6 +335,24 @@ func TestInternalTracesToJaegerProto(t *testing.T) {
 				assert.EqualValues(t, test.jb, *jbs[0])
 			}
 		})
+	}
+}
+
+func TestInternalTracesToJaegerProtoBatchesAndBack(t *testing.T) {
+	rscSpans, err := goldendataset.GenerateResourceSpans(
+		"../../../internal/goldendataset/testdata/generated_pict_pairs_traces.txt",
+		"../../../internal/goldendataset/testdata/generated_pict_pairs_spans.txt",
+		io.Reader(rand.New(rand.NewSource(2004))))
+	assert.NoError(t, err)
+	for _, rs := range rscSpans {
+		orig := make([]*otlptrace.ResourceSpans, 1)
+		orig[0] = rs
+		td := pdata.TracesFromOtlp(orig)
+		protoBatches, err := InternalTracesToJaegerProto(td)
+		assert.NoError(t, err)
+		tdFromPB := ProtoBatchesToInternalTraces(protoBatches)
+		assert.NotNil(t, tdFromPB)
+		assert.Equal(t, td.SpanCount(), tdFromPB.SpanCount())
 	}
 }
 
