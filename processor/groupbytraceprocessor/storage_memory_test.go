@@ -1,10 +1,10 @@
-// Copyright 2020 The OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,25 +27,21 @@ func TestMemoryCreateAndGetTrace(t *testing.T) {
 	// prepare
 	st := newMemoryStorage()
 
-	traceIDs := [][]byte{
-		{1, 2, 3, 4},
-		{2, 3, 4, 5},
+	traceIDs := []pdata.TraceID{
+		pdata.NewTraceID([]byte{1, 2, 3, 4}),
+		pdata.NewTraceID([]byte{2, 3, 4, 5}),
 	}
-
-	span := pdata.NewSpan()
-	span.InitEmpty()
-
-	ils := pdata.NewInstrumentationLibrarySpans()
-	ils.InitEmpty()
-	ils.Spans().Append(&span)
 
 	baseTrace := pdata.NewResourceSpans()
 	baseTrace.InitEmpty()
-	baseTrace.InstrumentationLibrarySpans().Append(&ils)
+	baseTrace.InstrumentationLibrarySpans().Resize(1)
+	ils := baseTrace.InstrumentationLibrarySpans().At(0)
+	ils.Spans().Resize(1)
+	span := ils.Spans().At(0)
 
 	// test
 	for _, traceID := range traceIDs {
-		span.SetTraceID(pdata.NewTraceID(traceID))
+		span.SetTraceID(traceID)
 		st.createOrAppend(traceID, baseTrace)
 	}
 
@@ -68,17 +64,14 @@ func TestMemoryDeleteTrace(t *testing.T) {
 	st := newMemoryStorage()
 
 	traceID := pdata.NewTraceID([]byte{1, 2, 3, 4})
-	span := pdata.NewSpan()
-	span.InitEmpty()
-	span.SetTraceID(traceID)
-
-	ils := pdata.NewInstrumentationLibrarySpans()
-	ils.InitEmpty()
-	ils.Spans().Append(&span)
 
 	trace := pdata.NewResourceSpans()
 	trace.InitEmpty()
-	trace.InstrumentationLibrarySpans().Append(&ils)
+	trace.InstrumentationLibrarySpans().Resize(1)
+	ils := trace.InstrumentationLibrarySpans().At(0)
+	ils.Spans().Resize(1)
+	span := ils.Spans().At(0)
+	span.SetTraceID(traceID)
 
 	st.createOrAppend(traceID, trace)
 
@@ -99,48 +92,37 @@ func TestMemoryAppendSpans(t *testing.T) {
 	st := newMemoryStorage()
 
 	traceID := pdata.NewTraceID([]byte{1, 2, 3, 4})
-	span := pdata.NewSpan()
-	span.InitEmpty()
-	span.SetTraceID(traceID)
-	span.SetSpanID(pdata.NewSpanID([]byte{1, 2, 3, 4}))
-
-	ils := pdata.NewInstrumentationLibrarySpans()
-	ils.InitEmpty()
-	ils.Spans().Append(&span)
 
 	batch := pdata.NewResourceSpans()
 	batch.InitEmpty()
-	batch.InstrumentationLibrarySpans().Append(&ils)
+	batch.InstrumentationLibrarySpans().Resize(1)
+	ils := batch.InstrumentationLibrarySpans().At(0)
+	ils.Spans().Resize(1)
+	span := ils.Spans().At(0)
+	span.SetTraceID(traceID)
+	span.SetSpanID(pdata.NewSpanID([]byte{1, 2, 3, 4}))
 
 	st.createOrAppend(traceID, batch)
 
-	secondSpan := pdata.NewSpan()
-	secondSpan.InitEmpty()
+	secondBatch := pdata.NewResourceSpans()
+	secondBatch.InitEmpty()
+	secondBatch.InstrumentationLibrarySpans().Resize(1)
+	secondIls := secondBatch.InstrumentationLibrarySpans().At(0)
+	secondIls.Spans().Resize(1)
+	secondSpan := secondIls.Spans().At(0)
 	secondSpan.SetName("second-name")
 	secondSpan.SetTraceID(traceID)
 	secondSpan.SetSpanID(pdata.NewSpanID([]byte{5, 6, 7, 8}))
-
-	secondIls := pdata.NewInstrumentationLibrarySpans()
-	secondIls.InitEmpty()
-	secondIls.Spans().Append(&secondSpan)
-
-	secondBatch := pdata.NewResourceSpans()
-	secondBatch.InitEmpty()
-	secondBatch.InstrumentationLibrarySpans().Append(&secondIls)
-
-	expectedIls := pdata.NewInstrumentationLibrarySpans()
-	expectedIls.InitEmpty()
-	expectedIls.Spans().Append(&span)
 
 	expected := []pdata.ResourceSpans{
 		pdata.NewResourceSpans(),
 		pdata.NewResourceSpans(),
 	}
 	expected[0].InitEmpty()
-	expected[0].InstrumentationLibrarySpans().Append(&expectedIls)
+	expected[0].InstrumentationLibrarySpans().Append(ils)
 
 	expected[1].InitEmpty()
-	expected[1].InstrumentationLibrarySpans().Append(&secondIls)
+	expected[1].InstrumentationLibrarySpans().Append(secondIls)
 
 	// test
 	err := st.createOrAppend(traceID, secondBatch)
@@ -164,19 +146,16 @@ func TestMemoryTraceIsBeingCloned(t *testing.T) {
 	// prepare
 	st := newMemoryStorage()
 	traceID := pdata.NewTraceID([]byte{1, 2, 3, 4})
-	span := pdata.NewSpan()
-	span.InitEmpty()
-	span.SetTraceID(traceID)
-	span.SetSpanID(pdata.NewSpanID([]byte{1, 2, 3, 4}))
-	span.SetName("should-not-be-changed")
-
-	ils := pdata.NewInstrumentationLibrarySpans()
-	ils.InitEmpty()
-	ils.Spans().Append(&span)
 
 	batch := pdata.NewResourceSpans()
 	batch.InitEmpty()
-	batch.InstrumentationLibrarySpans().Append(&ils)
+	batch.InstrumentationLibrarySpans().Resize(1)
+	ils := batch.InstrumentationLibrarySpans().At(0)
+	ils.Spans().Resize(1)
+	span := ils.Spans().At(0)
+	span.SetTraceID(traceID)
+	span.SetSpanID(pdata.NewSpanID([]byte{1, 2, 3, 4}))
+	span.SetName("should-not-be-changed")
 
 	// test
 	err := st.createOrAppend(traceID, batch)
@@ -192,7 +171,7 @@ func TestMemoryTraceIsBeingCloned(t *testing.T) {
 func TestCreateWithNilParameter(t *testing.T) {
 	// prepare
 	st := newMemoryStorage()
-	traceID := []byte{1, 2, 3, 4}
+	traceID := pdata.NewTraceID([]byte{1, 2, 3, 4})
 
 	// test
 	err := st.createOrAppend(traceID, pdata.NewResourceSpans())

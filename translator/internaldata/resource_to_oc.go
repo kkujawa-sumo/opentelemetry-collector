@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,17 @@
 package internaldata
 
 import (
-	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	occommon "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	ocresource "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
-	"github.com/golang/protobuf/ptypes"
 	"go.opencensus.io/resource/resourcekeys"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/translator/conventions"
+	tracetranslator "go.opentelemetry.io/collector/translator/trace"
 )
 
 type ocInferredResourceType struct {
@@ -62,6 +61,23 @@ var labelPresenceToResourceType = []ocInferredResourceType{
 	},
 }
 
+var langToOCLangCodeMap = getSDKLangToOCLangCodeMap()
+
+func getSDKLangToOCLangCodeMap() map[string]int32 {
+	mappings := make(map[string]int32)
+	mappings[conventions.AttributeSDKLangValueCPP] = 1
+	mappings[conventions.AttributeSDKLangValueDotNET] = 2
+	mappings[conventions.AttributeSDKLangValueErlang] = 3
+	mappings[conventions.AttributeSDKLangValueGo] = 4
+	mappings[conventions.AttributeSDKLangValueJava] = 5
+	mappings[conventions.AttributeSDKLangValueNodeJS] = 6
+	mappings[conventions.AttributeSDKLangValuePHP] = 7
+	mappings[conventions.AttributeSDKLangValuePython] = 8
+	mappings[conventions.AttributeSDKLangValueRuby] = 9
+	mappings[conventions.AttributeSDKLangValueWebJS] = 10
+	return mappings
+}
+
 func internalResourceToOC(resource pdata.Resource) (*occommon.Node, *ocresource.Resource) {
 	if resource.IsNil() {
 		return nil, nil
@@ -77,7 +93,7 @@ func internalResourceToOC(resource pdata.Resource) (*occommon.Node, *ocresource.
 
 	labels := make(map[string]string, attrs.Len())
 	attrs.ForEach(func(k string, v pdata.AttributeValue) {
-		val := attributeValueToString(v, false)
+		val := tracetranslator.AttributeValueToString(v, false)
 
 		switch k {
 		case conventions.OCAttributeResourceType:
@@ -92,10 +108,7 @@ func internalResourceToOC(resource pdata.Resource) (*occommon.Node, *ocresource.
 			if err != nil {
 				return
 			}
-			ts, err := ptypes.TimestampProto(t)
-			if err != nil {
-				return
-			}
+			ts := timestamppb.New(t)
 			if ocNode.Identifier == nil {
 				ocNode.Identifier = &occommon.ProcessIdentifier{}
 			}
@@ -125,7 +138,7 @@ func internalResourceToOC(resource pdata.Resource) (*occommon.Node, *ocresource.
 			}
 			ocNode.LibraryInfo.ExporterVersion = val
 		case conventions.AttributeTelemetrySDKLanguage:
-			if code, ok := occommon.LibraryInfo_Language_value[val]; ok {
+			if code, ok := langToOCLangCodeMap[val]; ok {
 				if ocNode.LibraryInfo == nil {
 					ocNode.LibraryInfo = &occommon.LibraryInfo{}
 				}
@@ -147,52 +160,6 @@ func internalResourceToOC(resource pdata.Resource) (*occommon.Node, *ocresource.
 	}
 
 	return &ocNode, &ocResource
-}
-
-func attributeValueToString(attr pdata.AttributeValue, jsonLike bool) string {
-	switch attr.Type() {
-	case pdata.AttributeValueNULL:
-		if jsonLike {
-			return "null"
-		}
-		return ""
-	case pdata.AttributeValueSTRING:
-		if jsonLike {
-			return fmt.Sprintf("%q", attr.StringVal())
-		}
-		return attr.StringVal()
-
-	case pdata.AttributeValueBOOL:
-		return strconv.FormatBool(attr.BoolVal())
-
-	case pdata.AttributeValueDOUBLE:
-		return strconv.FormatFloat(attr.DoubleVal(), 'f', -1, 64)
-
-	case pdata.AttributeValueINT:
-		return strconv.FormatInt(attr.IntVal(), 10)
-
-	case pdata.AttributeValueMAP:
-		// OpenCensus attributes cannot represent maps natively. Convert the
-		// map to a JSON-like string.
-		var sb strings.Builder
-		sb.WriteString("{")
-		m := attr.MapVal()
-		first := true
-		m.ForEach(func(k string, v pdata.AttributeValue) {
-			if !first {
-				sb.WriteString(",")
-			}
-			first = false
-			sb.WriteString(fmt.Sprintf("%q:%s", k, attributeValueToString(v, true)))
-		})
-		sb.WriteString("}")
-		return sb.String()
-
-	default:
-		return fmt.Sprintf("<Unknown OpenTelemetry attribute value type %q>", attr.Type())
-	}
-
-	// TODO: Add support for ARRAY type.
 }
 
 func inferResourceType(labels map[string]string) (string, bool) {

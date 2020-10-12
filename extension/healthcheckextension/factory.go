@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,13 +58,13 @@ func createExtension(_ context.Context, params component.ExtensionCreateParams, 
 	// the creation of multiple instances for unit tests. Summary: only a single
 	// instance can be created via the factory.
 	if !atomic.CompareAndSwapInt32(&instanceState, instanceNotCreated, instanceCreated) {
-		return nil, errors.New("only a single instance can be created per process")
+		return nil, errors.New("only a single health check extension instance can be created per process")
 	}
 
 	return newServer(*config, params.Logger), nil
 }
 
-// See comment in CreateExtension how these are used.
+// See comment in createExtension how these are used.
 var instanceState int32
 
 const (

@@ -1,10 +1,10 @@
-// Copyright 2020, OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@
 
 package goldendataset
 
-//// Start of PICT inputs for generating golden dataset ResourceSpans (pict_input_traces.txt) ////
+// Start of PICT inputs for generating golden dataset ResourceSpans (pict_input_traces.txt)
 
 // Input columns in pict_input_traces.txt
 const (
@@ -66,7 +66,7 @@ type PICTTracingInputs struct {
 	Spans PICTInputSpans
 }
 
-//// Start of PICT inputs for generating golden dataset Spans (pict_input_spans.txt) ////
+// Start of PICT inputs for generating golden dataset Spans (pict_input_spans.txt)
 
 // Input columns in pict_input_spans.txt
 const (

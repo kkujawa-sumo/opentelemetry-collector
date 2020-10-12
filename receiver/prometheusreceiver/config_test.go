@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/prometheus/discovery/kubernetes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -104,7 +105,7 @@ func TestLoadConfigK8s(t *testing.T) {
 		})
 
 	scrapeConfig := r.PrometheusConfig.ScrapeConfigs[0]
-	kubeSDConfig := scrapeConfig.ServiceDiscoveryConfig.KubernetesSDConfigs[0]
+	kubeSDConfig := scrapeConfig.ServiceDiscoveryConfigs[0].(*kubernetes.SDConfig)
 	assert.Equal(t,
 		kubeSDConfig.Selectors[0].Field,
 		fmt.Sprintf("spec.nodeName=%s", node))

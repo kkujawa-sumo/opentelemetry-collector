@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
 package configtest
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -32,19 +30,10 @@ import (
 // and can then be used to unmarshal the file contents to objects.
 // Example usage for testing can be found in configtest_test.go
 func NewViperFromYamlFile(t *testing.T, fileName string) *viper.Viper {
-	// Open the file for reading.
-	file, err := os.Open(filepath.Clean(fileName))
-	require.NoErrorf(t, err, "unable to open the file %v", fileName)
-	require.NotNil(t, file)
-
-	defer func() {
-		require.NoErrorf(t, file.Close(), "unable to close the file %v", fileName)
-	}()
-
 	// Read yaml config from file
 	v := config.NewViper()
-	v.SetConfigType("yaml")
-	require.NoErrorf(t, v.ReadConfig(file), "unable to read the file %v", fileName)
+	v.SetConfigFile(fileName)
+	require.NoErrorf(t, v.ReadInConfig(), "unable to read the file %v", fileName)
 
 	return v
 }

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,8 @@ import (
 
 	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"go.uber.org/zap"
+
+	"go.opentelemetry.io/collector/consumer/pdata"
 )
 
 type rateLimiting struct {
@@ -48,12 +50,12 @@ func (r *rateLimiting) OnLateArrivingSpans(Decision, []*tracepb.Span) error {
 }
 
 // EvaluateSecondChance looks at the trace again and if it can/cannot be fit, returns a SamplingDecision
-func (r *rateLimiting) EvaluateSecondChance(traceID []byte, trace *TraceData) (Decision, error) {
+func (r *rateLimiting) EvaluateSecondChance(_ pdata.TraceID, trace *TraceData) (Decision, error) {
 	return NotSampled, nil
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (r *rateLimiting) Evaluate(_ []byte, trace *TraceData) (Decision, error) {
+func (r *rateLimiting) Evaluate(_ pdata.TraceID, trace *TraceData) (Decision, error) {
 	r.logger.Debug("Evaluating spans in rate-limiting filter")
 	currSecond := time.Now().Unix()
 	if r.currentSecond != currSecond {
@@ -72,7 +74,7 @@ func (r *rateLimiting) Evaluate(_ []byte, trace *TraceData) (Decision, error) {
 
 // OnDroppedSpans is called when the trace needs to be dropped, due to memory
 // pressure, before the decision_wait time has been reached.
-func (r *rateLimiting) OnDroppedSpans([]byte, *TraceData) (Decision, error) {
+func (r *rateLimiting) OnDroppedSpans(_ pdata.TraceID, _ *TraceData) (Decision, error) {
 	r.logger.Debug("Triggering action for dropped spans in rate-limiting filter")
 	return Sampled, nil
 }

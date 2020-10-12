@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,9 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/exporter/exportertest"
+	"go.opentelemetry.io/collector/internal"
 	collectorlog "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/logs/v1"
+	v1 "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/common/v1"
 	otlplog "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/logs/v1"
 	"go.opentelemetry.io/collector/obsreport"
 	"go.opentelemetry.io/collector/testutil"
@@ -64,8 +66,8 @@ func TestExport(t *testing.T) {
 				{
 					Logs: []*otlplog.LogRecord{
 						{
-							TraceId:      traceID,
-							SpanId:       spanID,
+							TraceId:      v1.NewTraceID(traceID),
+							SpanId:       v1.NewSpanID(spanID),
 							Name:         "operationB",
 							TimeUnixNano: unixnanos,
 						},
@@ -77,7 +79,7 @@ func TestExport(t *testing.T) {
 
 	// Keep log data to compare the test result against it
 	// Clone needed because OTLP proto XXX_ fields are altered in the GRPC downstream
-	traceData := pdata.LogsFromOtlp(resourceLogs).Clone()
+	traceData := pdata.LogsFromInternalRep(internal.LogsFromOtlp(resourceLogs)).Clone()
 
 	req := &collectorlog.ExportLogsServiceRequest{
 		ResourceLogs: resourceLogs,

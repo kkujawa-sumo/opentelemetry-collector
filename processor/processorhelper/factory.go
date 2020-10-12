@@ -1,10 +1,10 @@
-// Copyright  OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,8 +48,6 @@ type factory struct {
 	createMetricsProcessor CreateMetricsProcessor
 	createLogsProcessor    CreateLogsProcessor
 }
-
-var _ component.LogsProcessorFactory = new(factory)
 
 // WithCustomUnmarshaler implements component.ConfigUnmarshaler.
 func WithCustomUnmarshaler(customUnmarshaler component.CustomUnmarshaler) FactoryOption {
@@ -111,11 +109,7 @@ func (f *factory) CreateDefaultConfig() configmodels.Processor {
 }
 
 // CreateTraceProcessor creates a component.TraceProcessor based on this config.
-func (f *factory) CreateTraceProcessor(
-	ctx context.Context,
-	params component.ProcessorCreateParams,
-	nextConsumer consumer.TraceConsumer,
-	cfg configmodels.Processor) (component.TraceProcessor, error) {
+func (f *factory) CreateTraceProcessor(ctx context.Context, params component.ProcessorCreateParams, cfg configmodels.Processor, nextConsumer consumer.TraceConsumer) (component.TraceProcessor, error) {
 	if f.createTraceProcessor != nil {
 		return f.createTraceProcessor(ctx, params, cfg, nextConsumer)
 	}
@@ -123,11 +117,7 @@ func (f *factory) CreateTraceProcessor(
 }
 
 // CreateMetricsProcessor creates a consumer.MetricsConsumer based on this config.
-func (f *factory) CreateMetricsProcessor(
-	ctx context.Context,
-	params component.ProcessorCreateParams,
-	nextConsumer consumer.MetricsConsumer,
-	cfg configmodels.Processor) (component.MetricsProcessor, error) {
+func (f *factory) CreateMetricsProcessor(ctx context.Context, params component.ProcessorCreateParams, cfg configmodels.Processor, nextConsumer consumer.MetricsConsumer) (component.MetricsProcessor, error) {
 	if f.createMetricsProcessor != nil {
 		return f.createMetricsProcessor(ctx, params, cfg, nextConsumer)
 	}

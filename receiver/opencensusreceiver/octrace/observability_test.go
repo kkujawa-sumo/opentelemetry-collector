@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,7 +44,7 @@ func TestEnsureRecordedMetrics(t *testing.T) {
 	require.NoError(t, err)
 	defer doneFn()
 
-	port, doneReceiverFn := ocReceiverOnGRPCServer(t, exportertest.NewNopTraceExporterOld())
+	port, doneReceiverFn := ocReceiverOnGRPCServer(t, exportertest.NewNopTraceExporter())
 	defer doneReceiverFn()
 
 	n := 20
@@ -66,7 +66,7 @@ func TestEnsureRecordedMetrics_zeroLengthSpansSender(t *testing.T) {
 	require.NoError(t, err)
 	defer doneFn()
 
-	port, doneFn := ocReceiverOnGRPCServer(t, exportertest.NewNopTraceExporterOld())
+	port, doneFn := ocReceiverOnGRPCServer(t, exportertest.NewNopTraceExporter())
 	defer doneFn()
 
 	n := 20
@@ -96,7 +96,7 @@ func TestExportSpanLinkingMaintainsParentLink(t *testing.T) {
 	trace.RegisterExporter(ocSpansSaver)
 	defer trace.UnregisterExporter(ocSpansSaver)
 
-	port, doneFn := ocReceiverOnGRPCServer(t, exportertest.NewNopTraceExporterOld())
+	port, doneFn := ocReceiverOnGRPCServer(t, exportertest.NewNopTraceExporter())
 	defer doneFn()
 
 	traceSvcClient, traceSvcDoneFn, err := makeTraceServiceClient(port)
@@ -178,12 +178,12 @@ func (tote *testOCTraceExporter) ExportSpan(sd *trace.SpanData) {
 // TODO: Determine how to do this deterministic.
 func flush(traceSvcDoneFn func()) {
 	// Give it enough time to process the streamed spans.
-	<-time.After(20 * time.Millisecond)
+	<-time.After(40 * time.Millisecond)
 
 	// End the gRPC service to complete the RPC trace so that we
 	// can examine the RPC trace as well.
 	traceSvcDoneFn()
 
 	// Give it some more time to complete the RPC trace and export.
-	<-time.After(20 * time.Millisecond)
+	<-time.After(40 * time.Millisecond)
 }

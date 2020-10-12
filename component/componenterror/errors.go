@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"go.opentelemetry.io/collector/consumer/consumererror"
 )
 
 var (
@@ -46,8 +48,16 @@ func CombineErrors(errs []error) error {
 	}
 
 	errMsgs := make([]string, 0, numErrors)
+	permanent := false
 	for _, err := range errs {
+		if !permanent && consumererror.IsPermanent(err) {
+			permanent = true
+		}
 		errMsgs = append(errMsgs, err.Error())
 	}
-	return fmt.Errorf("[%s]", strings.Join(errMsgs, "; "))
+	err := fmt.Errorf("[%s]", strings.Join(errMsgs, "; "))
+	if permanent {
+		err = consumererror.Permanent(err)
+	}
+	return err
 }

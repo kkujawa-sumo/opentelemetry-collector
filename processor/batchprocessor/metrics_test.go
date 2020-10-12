@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,21 +19,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"go.opentelemetry.io/collector/internal/collector/telemetry"
+	"go.opentelemetry.io/collector/config/configtelemetry"
 )
 
 func TestBatchProcessorMetrics(t *testing.T) {
 	tests := []struct {
 		viewNames []string
-		level     telemetry.Level
+		level     configtelemetry.Level
 	}{
 		{
 			viewNames: []string{"batch_size_trigger_send", "timeout_trigger_send", "batch_send_size", "batch_send_size_bytes"},
-			level:     telemetry.Detailed,
+			level:     configtelemetry.LevelDetailed,
 		},
 		{
 			viewNames: []string{},
-			level:     telemetry.None,
+			level:     configtelemetry.LevelNone,
 		},
 	}
 	for _, test := range tests {

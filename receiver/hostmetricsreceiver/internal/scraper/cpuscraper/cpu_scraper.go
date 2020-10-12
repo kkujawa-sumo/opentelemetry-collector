@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import (
 
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver/internal"
+	"go.opentelemetry.io/collector/receiver/hostmetricsreceiver/internal/metadata"
 )
 
 // scraper for CPU Metrics
@@ -72,9 +73,9 @@ func (s *scraper) ScrapeMetrics(_ context.Context) (pdata.MetricSlice, error) {
 }
 
 func initializeCPUTimeMetric(metric pdata.Metric, startTime, now pdata.TimestampUnixNano, cpuTimes []cpu.TimesStat) {
-	cpuTimeDescriptor.CopyTo(metric.MetricDescriptor())
+	metadata.Metrics.SystemCPUTime.CopyTo(metric)
 
-	ddps := metric.DoubleDataPoints()
+	ddps := metric.DoubleSum().DataPoints()
 	ddps.Resize(len(cpuTimes) * cpuStatesLen)
 	for i, cpuTime := range cpuTimes {
 		appendCPUTimeStateDataPoints(ddps, i*cpuStatesLen, startTime, now, cpuTime)
@@ -87,9 +88,9 @@ func initializeCPUTimeDataPoint(dataPoint pdata.DoubleDataPoint, startTime, now 
 	labelsMap := dataPoint.LabelsMap()
 	// ignore cpu label if reporting "total" cpu usage
 	if cpuLabel != gopsCPUTotal {
-		labelsMap.Insert(cpuLabelName, cpuLabel)
+		labelsMap.Insert(metadata.Labels.Cpu, cpuLabel)
 	}
-	labelsMap.Insert(stateLabelName, stateLabel)
+	labelsMap.Insert(metadata.Labels.CPUState, stateLabel)
 
 	dataPoint.SetStartTime(startTime)
 	dataPoint.SetTimestamp(now)

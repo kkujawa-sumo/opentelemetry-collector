@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import (
 	"github.com/rs/cors"
 
 	"go.opentelemetry.io/collector/config/configtls"
+	"go.opentelemetry.io/collector/internal/middleware"
 )
 
 type HTTPClientSettings struct {
@@ -40,6 +41,10 @@ type HTTPClientSettings struct {
 
 	// Timeout parameter configures `http.Client.Timeout`.
 	Timeout time.Duration `mapstructure:"timeout,omitempty"`
+
+	// Additional headers attached to each HTTP request sent by the client.
+	// Existing header values are overwritten if collision happens.
+	Headers map[string]string `mapstructure:"headers,omitempty"`
 }
 
 func (hcs *HTTPClientSettings) ToClient() (*http.Client, error) {
@@ -57,10 +62,38 @@ func (hcs *HTTPClientSettings) ToClient() (*http.Client, error) {
 	if hcs.WriteBufferSize > 0 {
 		transport.WriteBufferSize = hcs.WriteBufferSize
 	}
+	var clientTransport http.RoundTripper
+
+	if hcs.Headers != nil && len(hcs.Headers) > 0 {
+		clientTransport = &clientInterceptorRoundTripper{
+			transport: transport,
+			headers:   hcs.Headers,
+		}
+	} else {
+		clientTransport = transport
+	}
+
 	return &http.Client{
-		Transport: transport,
+		Transport: clientTransport,
 		Timeout:   hcs.Timeout,
 	}, nil
+}
+
+// Custom RoundTripper that add headers
+type clientInterceptorRoundTripper struct {
+	transport http.RoundTripper
+	headers   map[string]string
+}
+
+// Custom RoundTrip that add headers
+func (interceptor *clientInterceptorRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	for k, v := range interceptor.headers {
+		req.Header.Set(k, v)
+	}
+	// Send the request to Cortex
+	response, err := interceptor.transport.RoundTrip(req)
+
+	return response, err
 }
 
 type HTTPServerSettings struct {
@@ -94,11 +127,35 @@ func (hss *HTTPServerSettings) ToListener() (net.Listener, error) {
 	return listener, nil
 }
 
-func (hss *HTTPServerSettings) ToServer(handler http.Handler) *http.Server {
+// toServerOptions has options that change the behavior of the HTTP server
+// returned by HTTPServerSettings.ToServer().
+type toServerOptions struct {
+	errorHandler middleware.ErrorHandler
+}
+
+type ToServerOption func(opts *toServerOptions)
+
+// WithErrorHandler overrides the HTTP error handler that gets invoked
+// when there is a failure inside middleware.HTTPContentDecompressor.
+func WithErrorHandler(e middleware.ErrorHandler) ToServerOption {
+	return func(opts *toServerOptions) {
+		opts.errorHandler = e
+	}
+}
+
+func (hss *HTTPServerSettings) ToServer(handler http.Handler, opts ...ToServerOption) *http.Server {
+	serverOpts := &toServerOptions{}
+	for _, o := range opts {
+		o(serverOpts)
+	}
 	if len(hss.CorsOrigins) > 0 {
 		co := cors.Options{AllowedOrigins: hss.CorsOrigins}
 		handler = cors.New(co).Handler(handler)
 	}
+	handler = middleware.HTTPContentDecompressor(
+		handler,
+		middleware.WithErrorHandler(serverOpts.errorHandler),
+	)
 	return &http.Server{
 		Handler: handler,
 	}

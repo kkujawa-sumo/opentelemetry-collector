@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,6 @@ package config
 import (
 	"os"
 	"path"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -490,8 +489,8 @@ func TestDecodeConfig_Invalid(t *testing.T) {
 		{name: "unknown-receiver-type", expected: errUnknownType, expectedMessage: "receivers"},
 		{name: "unknown-exporter-type", expected: errUnknownType, expectedMessage: "exporters"},
 		{name: "unknown-processor-type", expected: errUnknownType, expectedMessage: "processors"},
-		{name: "invalid-service-extensions-value", expected: errUnmarshalError, expectedMessage: "service"},
-		{name: "invalid-sequence-value", expected: errUnmarshalError, expectedMessage: "pipelines"},
+		{name: "invalid-service-extensions-value", expected: errUnmarshalTopLevelStructureError, expectedMessage: "service"},
+		{name: "invalid-sequence-value", expected: errUnmarshalTopLevelStructureError, expectedMessage: "pipelines"},
 		{name: "invalid-pipeline-type", expected: errUnknownType, expectedMessage: "pipelines"},
 		{name: "invalid-pipeline-type-and-name", expected: errInvalidTypeAndNameKey},
 		{name: "duplicate-extension", expected: errDuplicateName, expectedMessage: "extensions"},
@@ -499,35 +498,41 @@ func TestDecodeConfig_Invalid(t *testing.T) {
 		{name: "duplicate-exporter", expected: errDuplicateName, expectedMessage: "exporters"},
 		{name: "duplicate-processor", expected: errDuplicateName, expectedMessage: "processors"},
 		{name: "duplicate-pipeline", expected: errDuplicateName, expectedMessage: "pipelines"},
-		{name: "invalid-top-level-section", expected: errUnmarshalError, expectedMessage: "top level"},
-		{name: "invalid-extension-section", expected: errUnmarshalError, expectedMessage: "extensions"},
-		{name: "invalid-service-section", expected: errUnmarshalError, expectedMessage: "service"},
-		{name: "invalid-receiver-section", expected: errUnmarshalError, expectedMessage: "receivers"},
-		{name: "invalid-processor-section", expected: errUnmarshalError, expectedMessage: "processors"},
-		{name: "invalid-exporter-section", expected: errUnmarshalError, expectedMessage: "exporters"},
-		{name: "invalid-pipeline-section", expected: errUnmarshalError, expectedMessage: "pipelines"},
+		{name: "invalid-top-level-section", expected: errUnmarshalTopLevelStructureError, expectedMessage: "top level"},
+		{name: "invalid-extension-section", expected: errUnmarshalTopLevelStructureError, expectedMessage: "extensions"},
+		{name: "invalid-service-section", expected: errUnmarshalTopLevelStructureError, expectedMessage: "service"},
+		{name: "invalid-receiver-section", expected: errUnmarshalTopLevelStructureError, expectedMessage: "receivers"},
+		{name: "invalid-processor-section", expected: errUnmarshalTopLevelStructureError, expectedMessage: "processors"},
+		{name: "invalid-exporter-section", expected: errUnmarshalTopLevelStructureError, expectedMessage: "exporters"},
+		{name: "invalid-pipeline-section", expected: errUnmarshalTopLevelStructureError, expectedMessage: "pipelines"},
+		{name: "invalid-extension-sub-config", expected: errUnmarshalTopLevelStructureError},
+		{name: "invalid-exporter-sub-config", expected: errUnmarshalTopLevelStructureError},
+		{name: "invalid-processor-sub-config", expected: errUnmarshalTopLevelStructureError},
+		{name: "invalid-receiver-sub-config", expected: errUnmarshalTopLevelStructureError},
+		{name: "invalid-pipeline-sub-config", expected: errUnmarshalTopLevelStructureError},
 	}
 
 	factories, err := componenttest.ExampleComponents()
 	assert.NoError(t, err)
 
 	for _, test := range testCases {
-		_, err := loadConfigFile(t, path.Join(".", "testdata", test.name+".yaml"), factories)
-		if err == nil {
-			t.Errorf("expected error but succeeded on invalid config case: %s", test.name)
-		} else if test.expected != 0 {
-			cfgErr, ok := err.(*configError)
-			if !ok {
-				t.Errorf("expected config error code %v but got a different error '%v' on invalid config case: %s",
-					test.expected, err, test.name)
-			} else {
-				assert.Equal(t, test.expected, cfgErr.code)
-				if test.expectedMessage != "" {
-					assert.Contains(t, cfgErr.Error(), test.expectedMessage)
+		t.Run(test.name, func(t *testing.T) {
+			_, err := loadConfigFile(t, path.Join(".", "testdata", test.name+".yaml"), factories)
+			if err == nil {
+				t.Error("expected error but succeeded")
+			} else if test.expected != 0 {
+				cfgErr, ok := err.(*configError)
+				if !ok {
+					t.Errorf("expected config error code %v but got a different error '%v'", test.expected, err)
+				} else {
+					assert.Equal(t, test.expected, cfgErr.code, err)
+					if test.expectedMessage != "" {
+						assert.Contains(t, cfgErr.Error(), test.expectedMessage)
+					}
+					assert.NotEmpty(t, cfgErr.Error(), "returned config error %v with empty error message", cfgErr.code)
 				}
-				assert.NotEmpty(t, cfgErr.Error(), "returned config error %v with empty error message", cfgErr.code)
 			}
-		}
+		})
 	}
 }
 
@@ -554,19 +559,10 @@ func TestLoadEmptyConfig(t *testing.T) {
 }
 
 func loadConfigFile(t *testing.T, fileName string, factories component.Factories) (*configmodels.Config, error) {
-	// Open the file for reading.
-	file, err := os.Open(filepath.Clean(fileName))
-	require.NoErrorf(t, err, "unable to open the file %v", fileName)
-	require.NotNil(t, file)
-
-	defer func() {
-		require.NoErrorf(t, file.Close(), "unable to close the file %v", fileName)
-	}()
-
 	// Read yaml config from file
 	v := NewViper()
-	v.SetConfigType("yaml")
-	require.NoErrorf(t, v.ReadConfig(file), "unable to read the file %v", fileName)
+	v.SetConfigFile(fileName)
+	require.NoErrorf(t, v.ReadInConfig(), "unable to read the file %v", fileName)
 
 	// Load the config from viper using the given factories.
 	cfg, err := Load(v, factories)

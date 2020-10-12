@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,13 +25,14 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/config/configtest"
+	"go.opentelemetry.io/collector/processor/samplingprocessor/tailsamplingprocessor/config"
 )
 
 func TestLoadConfig(t *testing.T) {
 	factories, err := componenttest.ExampleComponents()
 	assert.NoError(t, err)
 
-	factory := &Factory{}
+	factory := NewFactory()
 	factories.Processors[factory.Type()] = factory
 
 	cfg, err := configtest.LoadConfigFile(t, path.Join(".", "testdata", "tail_sampling_config.yaml"), factories)
@@ -39,7 +40,7 @@ func TestLoadConfig(t *testing.T) {
 	require.NotNil(t, cfg)
 
 	assert.Equal(t, cfg.Processors["tail_sampling"],
-		&Config{
+		&config.Config{
 			ProcessorSettings: configmodels.ProcessorSettings{
 				TypeVal: "tail_sampling",
 				NameVal: "tail_sampling",
@@ -47,41 +48,41 @@ func TestLoadConfig(t *testing.T) {
 			DecisionWait:            10 * time.Second,
 			NumTraces:               100,
 			ExpectedNewTracesPerSec: 10,
-			PolicyCfgs: []PolicyCfg{
+			PolicyCfgs: []config.PolicyCfg{
 				{
 					Name: "test-policy-1",
-					Type: AlwaysSample,
+					Type: config.AlwaysSample,
 				},
 				{
 					Name:                "test-policy-2",
-					Type:                NumericAttribute,
-					NumericAttributeCfg: NumericAttributeCfg{Key: "key1", MinValue: 50, MaxValue: 100},
+					Type:                config.NumericAttribute,
+					NumericAttributeCfg: config.NumericAttributeCfg{Key: "key1", MinValue: 50, MaxValue: 100},
 				},
 				{
 					Name:               "test-policy-3",
-					Type:               StringAttribute,
-					StringAttributeCfg: StringAttributeCfg{Key: "key2", Values: []string{"value1", "value2"}},
+					Type:               config.StringAttribute,
+					StringAttributeCfg: config.StringAttributeCfg{Key: "key2", Values: []string{"value1", "value2"}},
 				},
 				{
 					Name:            "test-policy-4",
-					Type:            RateLimiting,
-					RateLimitingCfg: RateLimitingCfg{SpansPerSecond: 35},
+					Type:            config.RateLimiting,
+					RateLimitingCfg: config.RateLimitingCfg{SpansPerSecond: 35},
 				},
 				{
 					Name: "test-policy-5",
-					Type: Cascading,
+					Type: config.Cascading,
 					SpansPerSecond: 1000,
-					Rules:     []CascadingRuleCfg{
+					Rules:     []config.CascadingRuleCfg{
 						{
 							Name: "num",
 							SpansPerSecond: 123,
-							NumericAttributeCfg: &NumericAttributeCfg{
+							NumericAttributeCfg: &config.NumericAttributeCfg{
 								Key: "key1", MinValue: 50, MaxValue: 100},
 						},
 						{
 							Name: "dur",
 							SpansPerSecond: 50,
-							DurationCfg: &DurationCfg{
+							DurationCfg: &config.DurationCfg{
 								MinDurationMicros: 9000000,
 							},
 						},
@@ -93,8 +94,8 @@ func TestLoadConfig(t *testing.T) {
 				},
 				{
 					Name:            "test-policy-6",
-					Type:            Duration,
-					DurationCfg: DurationCfg{
+					Type:            config.Duration,
+					DurationCfg: config.DurationCfg{
 						MinDurationMicros: 100000,
 					},
 				},

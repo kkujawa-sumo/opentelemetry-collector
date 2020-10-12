@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.opentelemetry.io/collector/consumer/pdata"
+	"go.opentelemetry.io/collector/internal/processor/filterconfig"
 	"go.opentelemetry.io/collector/internal/processor/filterset"
 )
 
@@ -33,24 +34,31 @@ func createConfig(matchType filterset.MatchType) *filterset.Config {
 func TestSpan_validateMatchesConfiguration_InvalidConfig(t *testing.T) {
 	testcases := []struct {
 		name        string
-		property    MatchProperties
+		property    filterconfig.MatchProperties
 		errorString string
 	}{
 		{
 			name:        "empty_property",
-			property:    MatchProperties{},
-			errorString: errAtLeastOneMatchFieldNeeded.Error(),
+			property:    filterconfig.MatchProperties{},
+			errorString: "at least one of \"services\", \"span_names\" or \"attributes\" field must be specified",
 		},
 		{
 			name: "empty_service_span_names_and_attributes",
-			property: MatchProperties{
+			property: filterconfig.MatchProperties{
 				Services: []string{},
 			},
-			errorString: errAtLeastOneMatchFieldNeeded.Error(),
+			errorString: "at least one of \"services\", \"span_names\" or \"attributes\" field must be specified",
+		},
+		{
+			name: "log_properties",
+			property: filterconfig.MatchProperties{
+				LogNames: []string{"log"},
+			},
+			errorString: "log_names should not be specified for trace spans",
 		},
 		{
 			name: "invalid_match_type",
-			property: MatchProperties{
+			property: filterconfig.MatchProperties{
 				Config:   *createConfig("wrong_match_type"),
 				Services: []string{"abc"},
 			},
@@ -58,16 +66,16 @@ func TestSpan_validateMatchesConfiguration_InvalidConfig(t *testing.T) {
 		},
 		{
 			name: "missing_match_type",
-			property: MatchProperties{
+			property: filterconfig.MatchProperties{
 				Services: []string{"abc"},
 			},
 			errorString: "error creating service name filters: unrecognized match_type: '', valid types are: [regexp strict]",
 		},
 		{
 			name: "regexp_match_type_for_attributes",
-			property: MatchProperties{
+			property: filterconfig.MatchProperties{
 				Config: *createConfig(filterset.Regexp),
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{Key: "key", Value: "value"},
 				},
 			},
@@ -75,7 +83,7 @@ func TestSpan_validateMatchesConfiguration_InvalidConfig(t *testing.T) {
 		},
 		{
 			name: "invalid_regexp_pattern",
-			property: MatchProperties{
+			property: filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Regexp),
 				Services: []string{"["},
 			},
@@ -83,7 +91,7 @@ func TestSpan_validateMatchesConfiguration_InvalidConfig(t *testing.T) {
 		},
 		{
 			name: "invalid_regexp_pattern2",
-			property: MatchProperties{
+			property: filterconfig.MatchProperties{
 				Config:    *createConfig(filterset.Regexp),
 				SpanNames: []string{"["},
 			},
@@ -91,10 +99,10 @@ func TestSpan_validateMatchesConfiguration_InvalidConfig(t *testing.T) {
 		},
 		{
 			name: "empty_key_name_in_attributes_list",
-			property: MatchProperties{
+			property: filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Strict),
 				Services: []string{"a"},
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key: "",
 					},
@@ -116,54 +124,54 @@ func TestSpan_validateMatchesConfiguration_InvalidConfig(t *testing.T) {
 func TestSpan_Matching_False(t *testing.T) {
 	testcases := []struct {
 		name       string
-		properties *MatchProperties
+		properties *filterconfig.MatchProperties
 	}{
 		{
 			name: "service_name_doesnt_match_regexp",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:     *createConfig(filterset.Regexp),
 				Services:   []string{"svcA"},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 
 		{
 			name: "service_name_doesnt_match_strict",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:     *createConfig(filterset.Strict),
 				Services:   []string{"svcA"},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 
 		{
 			name: "span_name_doesnt_match",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:     *createConfig(filterset.Regexp),
 				SpanNames:  []string{"spanNo.*Name"},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 
 		{
 			name: "span_name_doesnt_match_any",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config: *createConfig(filterset.Regexp),
 				SpanNames: []string{
 					"spanNo.*Name",
 					"non-matching?pattern",
 					"regular string",
 				},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 
 		{
 			name: "wrong_property_value",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Strict),
 				Services: []string{},
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key:   "keyInt",
 						Value: 1234,
@@ -173,10 +181,10 @@ func TestSpan_Matching_False(t *testing.T) {
 		},
 		{
 			name: "incompatible_property_value",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Strict),
 				Services: []string{},
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key:   "keyInt",
 						Value: "123",
@@ -186,10 +194,10 @@ func TestSpan_Matching_False(t *testing.T) {
 		},
 		{
 			name: "property_key_does_not_exist",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Strict),
 				Services: []string{},
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key:   "doesnotexist",
 						Value: nil,
@@ -215,10 +223,10 @@ func TestSpan_Matching_False(t *testing.T) {
 }
 
 func TestSpan_MatchingCornerCases(t *testing.T) {
-	cfg := &MatchProperties{
+	cfg := &filterconfig.MatchProperties{
 		Config:   *createConfig(filterset.Strict),
 		Services: []string{"svcA"},
-		Attributes: []Attribute{
+		Attributes: []filterconfig.Attribute{
 			{
 				Key:   "keyOne",
 				Value: nil,
@@ -236,7 +244,7 @@ func TestSpan_MatchingCornerCases(t *testing.T) {
 }
 
 func TestSpan_MissingServiceName(t *testing.T) {
-	cfg := &MatchProperties{
+	cfg := &filterconfig.MatchProperties{
 		Config:   *createConfig(filterset.Regexp),
 		Services: []string{"svcA"},
 	}
@@ -253,35 +261,35 @@ func TestSpan_MissingServiceName(t *testing.T) {
 func TestSpan_Matching_True(t *testing.T) {
 	testcases := []struct {
 		name       string
-		properties *MatchProperties
+		properties *filterconfig.MatchProperties
 	}{
 		{
 			name: "service_name_match_regexp",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:     *createConfig(filterset.Regexp),
 				Services:   []string{"svcA"},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 		{
 			name: "service_name_match_strict",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:     *createConfig(filterset.Strict),
 				Services:   []string{"svcA"},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 		{
 			name: "span_name_match",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:     *createConfig(filterset.Regexp),
 				SpanNames:  []string{"span.*"},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 		{
 			name: "span_name_second_match",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config: *createConfig(filterset.Regexp),
 				SpanNames: []string{
 					"wrong.*pattern",
@@ -289,15 +297,15 @@ func TestSpan_Matching_True(t *testing.T) {
 					"yet another?pattern",
 					"regularstring",
 				},
-				Attributes: []Attribute{},
+				Attributes: []filterconfig.Attribute{},
 			},
 		},
 		{
 			name: "property_exact_value_match",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Strict),
 				Services: []string{},
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key:   "keyString",
 						Value: "arithmetic",
@@ -319,10 +327,10 @@ func TestSpan_Matching_True(t *testing.T) {
 		},
 		{
 			name: "property_exists",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Strict),
 				Services: []string{"svcA"},
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key:   "keyExists",
 						Value: nil,
@@ -332,10 +340,10 @@ func TestSpan_Matching_True(t *testing.T) {
 		},
 		{
 			name: "match_all_settings_exists",
-			properties: &MatchProperties{
+			properties: &filterconfig.MatchProperties{
 				Config:   *createConfig(filterset.Strict),
 				Services: []string{"svcA"},
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key:   "keyExists",
 						Value: nil,
@@ -367,8 +375,7 @@ func TestSpan_Matching_True(t *testing.T) {
 			assert.NotNil(t, mp)
 
 			assert.NotNil(t, span)
-			// assert.True(t, mp.MatchSpan(span, "svcA"))
-
+			assert.True(t, mp.MatchSpan(span, "svcA"))
 		})
 	}
 }
@@ -376,14 +383,14 @@ func TestSpan_Matching_True(t *testing.T) {
 func TestSpan_validateMatchesConfigurationForAttributes(t *testing.T) {
 	testcase := []struct {
 		name   string
-		input  MatchProperties
+		input  filterconfig.MatchProperties
 		output Matcher
 	}{
 		{
 			name: "attributes_build",
-			input: MatchProperties{
+			input: filterconfig.MatchProperties{
 				Config: *createConfig(filterset.Strict),
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key: "key1",
 					},
@@ -408,9 +415,9 @@ func TestSpan_validateMatchesConfigurationForAttributes(t *testing.T) {
 
 		{
 			name: "both_set_of_attributes",
-			input: MatchProperties{
+			input: filterconfig.MatchProperties{
 				Config: *createConfig(filterset.Strict),
-				Attributes: []Attribute{
+				Attributes: []filterconfig.Attribute{
 					{
 						Key: "key1",
 					},

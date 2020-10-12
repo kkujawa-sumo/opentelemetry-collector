@@ -1,10 +1,10 @@
-// Copyright 2020, OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,30 +46,6 @@ func getNonSpanAttributes() map[string]struct{} {
 	attrs[conventions.OCAttributeProcessID] = struct{}{}
 	attrs[conventions.OCAttributeResourceType] = struct{}{}
 	return attrs
-}
-
-type AttrValDescript struct {
-	regex    *regexp.Regexp
-	attrType pdata.AttributeValueType
-}
-
-var attrValDescriptions = getAttrValDescripts()
-
-func getAttrValDescripts() []*AttrValDescript {
-	descriptions := make([]*AttrValDescript, 0, 5)
-	descriptions = append(descriptions, constructAttrValDescript("^$", pdata.AttributeValueNULL))
-	descriptions = append(descriptions, constructAttrValDescript(`^-?\d+$`, pdata.AttributeValueINT))
-	descriptions = append(descriptions, constructAttrValDescript(`^-?\d+\.\d+$`, pdata.AttributeValueDOUBLE))
-	descriptions = append(descriptions, constructAttrValDescript(`^(true|false)$`, pdata.AttributeValueBOOL))
-	return descriptions
-}
-
-func constructAttrValDescript(regex string, attrType pdata.AttributeValueType) *AttrValDescript {
-	regexc, _ := regexp.Compile(regex)
-	return &AttrValDescript{
-		regex:    regexc,
-		attrType: attrType,
-	}
 }
 
 // Custom Sort on
@@ -152,23 +127,21 @@ func V2SpansToInternalTraces(zipkinSpans []*zipkinmodel.SpanModel) (pdata.Traces
 func zSpanToInternal(zspan *zipkinmodel.SpanModel, tags map[string]string, dest pdata.Span) error {
 	dest.InitEmpty()
 
-	dest.SetTraceID(tracetranslator.UInt64ToByteTraceID(zspan.TraceID.High, zspan.TraceID.Low))
-	dest.SetSpanID(tracetranslator.UInt64ToByteSpanID(uint64(zspan.ID)))
+	dest.SetTraceID(tracetranslator.UInt64ToTraceID(zspan.TraceID.High, zspan.TraceID.Low))
+	dest.SetSpanID(tracetranslator.UInt64ToSpanID(uint64(zspan.ID)))
 	if value, ok := tags[tracetranslator.TagW3CTraceState]; ok {
 		dest.SetTraceState(pdata.TraceState(value))
 		delete(tags, tracetranslator.TagW3CTraceState)
 	}
 	parentID := zspan.ParentID
 	if parentID != nil && *parentID != zspan.ID {
-		dest.SetParentSpanID(tracetranslator.UInt64ToByteSpanID(uint64(*parentID)))
+		dest.SetParentSpanID(tracetranslator.UInt64ToSpanID(uint64(*parentID)))
 	}
 
 	dest.SetName(zspan.Name)
 	startNano := zspan.Timestamp.UnixNano()
 	dest.SetStartTime(pdata.TimestampUnixNano(startNano))
-	if zspan.Duration.Nanoseconds() > 0 {
-		dest.SetEndTime(pdata.TimestampUnixNano(startNano + zspan.Duration.Nanoseconds()))
-	}
+	dest.SetEndTime(pdata.TimestampUnixNano(startNano + zspan.Duration.Nanoseconds()))
 	dest.SetKind(zipkinKindToSpanKind(zspan.Kind, tags))
 
 	populateSpanStatus(tags, dest.Status())
@@ -238,16 +211,21 @@ func zTagsToSpanLinks(tags map[string]string, dest pdata.SpanLinkSlice) error {
 		link := dest.At(index)
 		index++
 		link.InitEmpty()
+
+		// Convert trace id.
 		rawTrace, errTrace := hex.DecodeString(parts[0])
 		if errTrace != nil {
 			return errTrace
 		}
 		link.SetTraceID(pdata.NewTraceID(rawTrace))
+
+		// Convert span id.
 		rawSpan, errSpan := hex.DecodeString(parts[1])
 		if errSpan != nil {
 			return errSpan
 		}
 		link.SetSpanID(pdata.NewSpanID(rawSpan))
+
 		link.SetTraceState(pdata.TraceState(parts[2]))
 
 		var jsonStr string
@@ -365,30 +343,10 @@ func tagsToAttributeMap(tags map[string]string, dest pdata.AttributeMap) error {
 		if _, ok := nonSpanAttributes[key]; ok {
 			continue
 		}
-		switch determineValueType(val) {
-		case pdata.AttributeValueINT:
-			iVal, _ := strconv.ParseInt(val, 10, 64)
-			dest.UpsertInt(key, iVal)
-		case pdata.AttributeValueDOUBLE:
-			fVal, _ := strconv.ParseFloat(val, 64)
-			dest.UpsertDouble(key, fVal)
-		case pdata.AttributeValueBOOL:
-			bVal, _ := strconv.ParseBool(val)
-			dest.UpsertBool(key, bVal)
-		default:
-			dest.UpsertString(key, val)
-		}
+		dest.UpsertString(key, val)
+		// TODO add translation to native OTLP types if configured to do so
 	}
 	return parseErr
-}
-
-func determineValueType(value string) pdata.AttributeValueType {
-	for _, desc := range attrValDescriptions {
-		if desc.regex.MatchString(value) {
-			return desc.attrType
-		}
-	}
-	return pdata.AttributeValueSTRING
 }
 
 func populateResourceFromZipkinSpan(tags map[string]string, localServiceName string, resource pdata.Resource) {
@@ -449,7 +407,7 @@ func copySpanTags(tags map[string]string) map[string]string {
 }
 
 func extractLocalServiceName(zspan *zipkinmodel.SpanModel) string {
-	if zspan == nil || zspan.LocalEndpoint == nil {
+	if zspan == nil || zspan.LocalEndpoint == nil || zspan.LocalEndpoint.ServiceName == "" {
 		return tracetranslator.ResourceNotSet
 	}
 	return zspan.LocalEndpoint.ServiceName

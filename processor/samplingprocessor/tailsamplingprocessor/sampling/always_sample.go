@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,8 @@ package sampling
 import (
 	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"go.uber.org/zap"
+
+	"go.opentelemetry.io/collector/consumer/pdata"
 )
 
 type alwaysSample struct {
@@ -42,19 +44,19 @@ func (as *alwaysSample) OnLateArrivingSpans(Decision, []*tracepb.Span) error {
 }
 
 // EvaluateSecondChance looks at the trace again and if it can/cannot be fit, returns a SamplingDecision
-func (as *alwaysSample) EvaluateSecondChance(traceID []byte, trace *TraceData) (Decision, error) {
+func (as *alwaysSample) EvaluateSecondChance(_ pdata.TraceID, trace *TraceData) (Decision, error) {
 	return NotSampled, nil
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (as *alwaysSample) Evaluate([]byte, *TraceData) (Decision, error) {
+func (as *alwaysSample) Evaluate(pdata.TraceID, *TraceData) (Decision, error) {
 	as.logger.Debug("Evaluating spans in always-sample filter")
 	return Sampled, nil
 }
 
 // OnDroppedSpans is called when the trace needs to be dropped, due to memory
 // pressure, before the decision_wait time has been reached.
-func (as *alwaysSample) OnDroppedSpans([]byte, *TraceData) (Decision, error) {
+func (as *alwaysSample) OnDroppedSpans(pdata.TraceID, *TraceData) (Decision, error) {
 	as.logger.Debug("Triggering action for dropped spans in always-sample filter")
 	return Sampled, nil
 }

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/collector/client"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/pdata"
+	"go.opentelemetry.io/collector/internal"
 	collectorlog "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/logs/v1"
 	"go.opentelemetry.io/collector/obsreport"
 )
@@ -53,7 +54,7 @@ func (r *Receiver) Export(ctx context.Context, req *collectorlog.ExportLogsServi
 	// We need to ensure that it propagates the receiver name as a tag
 	ctxWithReceiverName := obsreport.ReceiverContext(ctx, r.instanceName, receiverTransport, receiverTagValue)
 
-	ld := pdata.LogsFromOtlp(req.ResourceLogs)
+	ld := pdata.LogsFromInternalRep(internal.LogsFromOtlp(req.ResourceLogs))
 	err := r.sendToNextConsumer(ctxWithReceiverName, ld)
 	if err != nil {
 		return nil, err

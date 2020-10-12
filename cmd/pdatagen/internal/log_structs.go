@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package internal
 var logFile = &File{
 	Name: "log",
 	imports: []string{
+		`otlpcommon "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/common/v1"`,
 		`otlplogs "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/logs/v1"`,
 	},
 	testImports: []string{
@@ -48,7 +49,7 @@ var resourceLogs = &messageStruct{
 	fields: []baseField{
 		resourceField,
 		&sliceField{
-			fieldMame:       "InstrumentationLibraryLogs",
+			fieldName:       "InstrumentationLibraryLogs",
 			originFieldName: "InstrumentationLibraryLogs",
 			returnSlice:     instrumentationLibraryLogsSlice,
 		},
@@ -67,7 +68,7 @@ var instrumentationLibraryLogs = &messageStruct{
 	fields: []baseField{
 		instrumentationLibraryField,
 		&sliceField{
-			fieldMame:       "Logs",
+			fieldName:       "Logs",
 			originFieldName: "Logs",
 			returnSlice:     logSlice,
 		},
@@ -85,7 +86,7 @@ var logRecord = &messageStruct{
 	originFullName: "otlplogs.LogRecord",
 	fields: []baseField{
 		&primitiveTypedField{
-			fieldMame:       "Timestamp",
+			fieldName:       "Timestamp",
 			originFieldName: "TimeUnixNano",
 			returnType:      "TimestampUnixNano",
 			rawType:         "uint64",
@@ -95,7 +96,7 @@ var logRecord = &messageStruct{
 		traceIDField,
 		spanIDField,
 		&primitiveTypedField{
-			fieldMame:       "Flags",
+			fieldName:       "Flags",
 			originFieldName: "Flags",
 			returnType:      "uint32",
 			rawType:         "uint32",
@@ -103,14 +104,14 @@ var logRecord = &messageStruct{
 			testVal:         `uint32(0x01)`,
 		},
 		&primitiveField{
-			fieldMame:       "SeverityText",
+			fieldName:       "SeverityText",
 			originFieldName: "SeverityText",
 			returnType:      "string",
 			defaultVal:      `""`,
 			testVal:         `"INFO"`,
 		},
 		&primitiveTypedField{
-			fieldMame:       "SeverityNumber",
+			fieldName:       "SeverityNumber",
 			originFieldName: "SeverityNumber",
 			returnType:      "SeverityNumber",
 			rawType:         "otlplogs.SeverityNumber",
@@ -118,7 +119,7 @@ var logRecord = &messageStruct{
 			testVal:         `SeverityNumberINFO`,
 		},
 		&primitiveField{
-			fieldMame:       "Name",
+			fieldName:       "Name",
 			originFieldName: "Name",
 			returnType:      "string",
 			defaultVal:      `""`,

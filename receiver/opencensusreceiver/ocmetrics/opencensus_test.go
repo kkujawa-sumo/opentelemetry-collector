@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,18 +29,55 @@ import (
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	agentmetricspb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/metrics/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/exporter/exportertest"
-	"go.opentelemetry.io/collector/internal"
+	"go.opentelemetry.io/collector/exporter/opencensusexporter"
+	"go.opentelemetry.io/collector/internal/data/testdata"
 	"go.opentelemetry.io/collector/obsreport"
 	"go.opentelemetry.io/collector/testutil"
+	"go.opentelemetry.io/collector/translator/internaldata"
 )
 
-// TODO: add E2E tests once ocagent implements metric service client.
+func TestReceiver_endToEnd(t *testing.T) {
+	metricSink := new(exportertest.SinkMetricsExporter)
+
+	port, doneFn := ocReceiverOnGRPCServer(t, metricSink)
+	defer doneFn()
+
+	address := fmt.Sprintf("localhost:%d", port)
+	expFactory := opencensusexporter.NewFactory()
+	expCfg := expFactory.CreateDefaultConfig().(*opencensusexporter.Config)
+	expCfg.GRPCClientSettings.TLSSetting.Insecure = true
+	expCfg.Endpoint = address
+	expCfg.WaitForReady = true
+	oce, err := expFactory.CreateMetricsExporter(context.Background(), component.ExporterCreateParams{Logger: zap.NewNop()}, expCfg)
+	require.NoError(t, err)
+	err = oce.Start(context.Background(), componenttest.NewNopHost())
+	require.NoError(t, err)
+
+	defer func() {
+		require.NoError(t, oce.Shutdown(context.Background()))
+	}()
+
+	md := testdata.GenerateMetricsOneMetric()
+	assert.NoError(t, oce.ConsumeMetrics(context.Background(), md))
+
+	testutil.WaitFor(t, func() bool {
+		return len(metricSink.AllMetrics()) != 0
+	})
+	gotMetrics := metricSink.AllMetrics()
+	require.Len(t, gotMetrics, 1)
+	assert.Equal(t, md, gotMetrics[0])
+}
 
 // Issue #43. Export should support node multiplexing.
 // The goal is to ensure that Receiver can always support
@@ -49,7 +86,7 @@ import (
 // accept nodes from downstream sources, but if a node isn't specified in
 // an exportMetrics request, assume it is from the last received and non-nil node.
 func TestExportMultiplexing(t *testing.T) {
-	metricSink := new(exportertest.SinkMetricsExporterOld)
+	metricSink := new(exportertest.SinkMetricsExporter)
 
 	port, doneFn := ocReceiverOnGRPCServer(t, metricSink)
 	defer doneFn()
@@ -115,7 +152,10 @@ func TestExportMultiplexing(t *testing.T) {
 	// Examination time!
 	resultsMapping := make(map[string][]*metricspb.Metric)
 	for _, md := range metricSink.AllMetrics() {
-		resultsMapping[nodeToKey(md.Node)] = append(resultsMapping[nodeToKey(md.Node)], md.Metrics...)
+		ocmds := internaldata.MetricsToOC(md)
+		for _, ocmd := range ocmds {
+			resultsMapping[nodeToKey(ocmd.Node)] = append(resultsMapping[nodeToKey(ocmd.Node)], ocmd.Metrics...)
+		}
 	}
 
 	// First things first, we expect exactly 3 unique keys
@@ -158,7 +198,7 @@ func TestExportMultiplexing(t *testing.T) {
 // The first message without a Node MUST be rejected and teardown the connection.
 // See https://github.com/census-instrumentation/opencensus-service/issues/53
 func TestExportProtocolViolations_nodelessFirstMessage(t *testing.T) {
-	metricSink := new(exportertest.SinkMetricsExporterOld)
+	metricSink := new(exportertest.SinkMetricsExporter)
 
 	port, doneFn := ocReceiverOnGRPCServer(t, metricSink)
 	defer doneFn()
@@ -228,11 +268,9 @@ func TestExportProtocolViolations_nodelessFirstMessage(t *testing.T) {
 // metrics should be received and NEVER discarded.
 // See https://github.com/census-instrumentation/opencensus-service/issues/51
 func TestExportProtocolConformation_metricsInFirstMessage(t *testing.T) {
-	t.Skipf("Currently disabled, this test is flaky on Windows. Enable this test when the following are fixed:\nIssue %s\n",
-		"https://github.com/census-instrumentation/opencensus-service/issues/225",
-	)
+	// This test used to be flaky on Windows. Skip if errors pop up again
 
-	metricSink := new(exportertest.SinkMetricsExporterOld)
+	metricSink := new(exportertest.SinkMetricsExporter)
 
 	port, doneFn := ocReceiverOnGRPCServer(t, metricSink)
 	defer doneFn()
@@ -255,7 +293,10 @@ func TestExportProtocolConformation_metricsInFirstMessage(t *testing.T) {
 	// Examination time!
 	resultsMapping := make(map[string][]*metricspb.Metric)
 	for _, md := range metricSink.AllMetrics() {
-		resultsMapping[nodeToKey(md.Node)] = append(resultsMapping[nodeToKey(md.Node)], md.Metrics...)
+		ocmds := internaldata.MetricsToOC(md)
+		for _, ocmd := range ocmds {
+			resultsMapping[nodeToKey(ocmd.Node)] = append(resultsMapping[nodeToKey(ocmd.Node)], ocmd.Metrics...)
+		}
 	}
 
 	if g, w := len(resultsMapping), 1; g != w {
@@ -309,7 +350,7 @@ func nodeToKey(n *commonpb.Node) string {
 	return string(blob)
 }
 
-func ocReceiverOnGRPCServer(t *testing.T, sr consumer.MetricsConsumerOld) (int, func()) {
+func ocReceiverOnGRPCServer(t *testing.T, sr consumer.MetricsConsumer) (int, func()) {
 	ln, err := net.Listen("tcp", "localhost:")
 	require.NoError(t, err, "Failed to find an available address to run the gRPC server: %v", err)
 
@@ -341,8 +382,7 @@ func ocReceiverOnGRPCServer(t *testing.T, sr consumer.MetricsConsumerOld) (int, 
 
 func makeMetric(val int) *metricspb.Metric {
 	key := &metricspb.LabelKey{
-		Key:         fmt.Sprintf("%s%d", "key", val),
-		Description: "label key",
+		Key: fmt.Sprintf("%s%d", "key", val),
 	}
 	value := &metricspb.LabelValue{
 		Value:    fmt.Sprintf("%s%d", "value", val),
@@ -359,14 +399,14 @@ func makeMetric(val int) *metricspb.Metric {
 
 	now := time.Now().UTC()
 	point := &metricspb.Point{
-		Timestamp: internal.TimeToTimestamp(now.Add(20 * time.Second)),
+		Timestamp: timestamppb.New(now.Add(20 * time.Second)),
 		Value: &metricspb.Point_Int64Value{
 			Int64Value: int64(val),
 		},
 	}
 
 	ts := &metricspb.TimeSeries{
-		StartTimestamp: internal.TimeToTimestamp(now.Add(-10 * time.Second)),
+		StartTimestamp: timestamppb.New(now.Add(-10 * time.Second)),
 		LabelValues:    []*metricspb.LabelValue{value},
 		Points:         []*metricspb.Point{point},
 	}

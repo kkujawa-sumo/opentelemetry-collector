@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package internal
 var traceFile = &File{
 	Name: "trace",
 	imports: []string{
+		`otlpcommon "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/common/v1"`,
 		`otlptrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/trace/v1"`,
 	},
 	testImports: []string{
@@ -53,7 +54,7 @@ var resourceSpans = &messageStruct{
 	fields: []baseField{
 		resourceField,
 		&sliceField{
-			fieldMame:       "InstrumentationLibrarySpans",
+			fieldName:       "InstrumentationLibrarySpans",
 			originFieldName: "InstrumentationLibrarySpans",
 			returnSlice:     instrumentationLibrarySpansSlice,
 		},
@@ -72,7 +73,7 @@ var instrumentationLibrarySpans = &messageStruct{
 	fields: []baseField{
 		instrumentationLibraryField,
 		&sliceField{
-			fieldMame:       "Spans",
+			fieldName:       "Spans",
 			originFieldName: "Spans",
 			returnSlice:     spanSlice,
 		},
@@ -96,7 +97,7 @@ var span = &messageStruct{
 		parentSpanIDField,
 		nameField,
 		&primitiveTypedField{
-			fieldMame:       "Kind",
+			fieldName:       "Kind",
 			originFieldName: "Kind",
 			returnType:      "SpanKind",
 			rawType:         "otlptrace.Span_SpanKind",
@@ -108,24 +109,24 @@ var span = &messageStruct{
 		attributes,
 		droppedAttributesCount,
 		&sliceField{
-			fieldMame:       "Events",
+			fieldName:       "Events",
 			originFieldName: "Events",
 			returnSlice:     spanEventSlice,
 		},
 		&primitiveField{
-			fieldMame:       "DroppedEventsCount",
+			fieldName:       "DroppedEventsCount",
 			originFieldName: "DroppedEventsCount",
 			returnType:      "uint32",
 			defaultVal:      "uint32(0)",
 			testVal:         "uint32(17)",
 		},
 		&sliceField{
-			fieldMame:       "Links",
+			fieldName:       "Links",
 			originFieldName: "Links",
 			returnSlice:     spanLinkSlice,
 		},
 		&primitiveField{
-			fieldMame:       "DroppedLinksCount",
+			fieldName:       "DroppedLinksCount",
 			originFieldName: "DroppedLinksCount",
 			returnType:      "uint32",
 			defaultVal:      "uint32(0)",
@@ -183,7 +184,7 @@ var spanStatus = &messageStruct{
 	originFullName: "otlptrace.Status",
 	fields: []baseField{
 		&primitiveTypedField{
-			fieldMame:       "Code",
+			fieldName:       "Code",
 			originFieldName: "Code",
 			returnType:      "StatusCode",
 			rawType:         "otlptrace.Status_StatusCode",
@@ -191,7 +192,7 @@ var spanStatus = &messageStruct{
 			testVal:         "StatusCode(1)",
 		},
 		&primitiveField{
-			fieldMame:       "Message",
+			fieldName:       "Message",
 			originFieldName: "Message",
 			returnType:      "string",
 			defaultVal:      `""`,
@@ -201,34 +202,34 @@ var spanStatus = &messageStruct{
 }
 
 var traceIDField = &primitiveTypedField{
-	fieldMame:       "TraceID",
+	fieldName:       "TraceID",
 	originFieldName: "TraceId",
 	returnType:      "TraceID",
-	rawType:         "[]byte",
+	rawType:         "otlpcommon.TraceID",
 	defaultVal:      "NewTraceID(nil)",
 	testVal:         "NewTraceID([]byte{1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1})",
 }
 
 var spanIDField = &primitiveTypedField{
-	fieldMame:       "SpanID",
+	fieldName:       "SpanID",
 	originFieldName: "SpanId",
 	returnType:      "SpanID",
-	rawType:         "[]byte",
+	rawType:         "otlpcommon.SpanID",
 	defaultVal:      "NewSpanID(nil)",
 	testVal:         "NewSpanID([]byte{1, 2, 3, 4, 5, 6, 7, 8})",
 }
 
 var parentSpanIDField = &primitiveTypedField{
-	fieldMame:       "ParentSpanID",
+	fieldName:       "ParentSpanID",
 	originFieldName: "ParentSpanId",
 	returnType:      "SpanID",
-	rawType:         "[]byte",
+	rawType:         "otlpcommon.SpanID",
 	defaultVal:      "NewSpanID(nil)",
 	testVal:         "NewSpanID([]byte{8, 7, 6, 5, 4, 3, 2, 1})",
 }
 
 var traceStateField = &primitiveTypedField{
-	fieldMame:       "TraceState",
+	fieldName:       "TraceState",
 	originFieldName: "TraceState",
 	returnType:      "TraceState",
 	rawType:         "string",
@@ -237,7 +238,7 @@ var traceStateField = &primitiveTypedField{
 }
 
 var droppedAttributesCount = &primitiveField{
-	fieldMame:       "DroppedAttributesCount",
+	fieldName:       "DroppedAttributesCount",
 	originFieldName: "DroppedAttributesCount",
 	returnType:      "uint32",
 	defaultVal:      "uint32(0)",

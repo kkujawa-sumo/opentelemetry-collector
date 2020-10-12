@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
+	"go.opentelemetry.io/collector/translator/internaldata"
 )
 
 var errBlankPrometheusAddress = errors.New("expecting a non-blank address to run the Prometheus metrics handler")
@@ -42,7 +42,7 @@ func (pe *prometheusExporter) Start(_ context.Context, _ component.Host) error {
 }
 
 func (pe *prometheusExporter) ConsumeMetrics(ctx context.Context, md pdata.Metrics) error {
-	ocmds := pdatautil.MetricsToMetricsData(md)
+	ocmds := internaldata.MetricsToOC(md)
 	for _, ocmd := range ocmds {
 		merged := make(map[string]*metricspb.Metric)
 		for _, metric := range ocmd.Metrics {

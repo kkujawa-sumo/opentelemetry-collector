@@ -1,10 +1,10 @@
-// Copyright  OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,13 +42,11 @@ func TestNewTrace(t *testing.T) {
 	assert.EqualValues(t, defaultCfg, factory.CreateDefaultConfig())
 	_, ok := factory.(component.ConfigUnmarshaler)
 	assert.False(t, ok)
-	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
+	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.Error(t, err)
-	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
+	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.Error(t, err)
-
-	lfactory := factory.(component.LogsProcessorFactory)
-	_, err = lfactory.CreateLogsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
+	_, err = factory.CreateLogsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.Error(t, err)
 }
 
@@ -67,14 +65,13 @@ func TestNewMetrics_WithConstructors(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, errors.New("my error"), fu.Unmarshal(nil, nil))
 
-	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
+	_, err := factory.CreateTraceProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.NoError(t, err)
 
-	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, nil, defaultCfg)
+	_, err = factory.CreateMetricsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.NoError(t, err)
 
-	lfactory := factory.(component.LogsProcessorFactory)
-	_, err = lfactory.CreateLogsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
+	_, err = factory.CreateLogsProcessor(context.Background(), component.ProcessorCreateParams{}, defaultCfg, nil)
 	assert.NoError(t, err)
 }
 

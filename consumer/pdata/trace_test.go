@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +18,12 @@ import (
 	"testing"
 
 	gogoproto "github.com/gogo/protobuf/proto"
-	goproto "github.com/golang/protobuf/proto" //lint:ignore SA1019 golang/protobuf/proto is deprecated
-	otlptracegoproto "github.com/open-telemetry/opentelemetry-proto/gen/go/trace/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	goproto "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 
+	otlpcollectortrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/trace/v1"
 	otlptrace "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/trace/v1"
 )
 
@@ -70,7 +71,7 @@ func TestSize(t *testing.T) {
 	assert.Equal(t, sizeBytes, md.Size())
 }
 
-func TestSizeWithNils(t *testing.T) {
+func TestTracesSizeWithNils(t *testing.T) {
 	assert.Equal(t, 0, TracesFromOtlp([]*otlptrace.ResourceSpans{nil, {}}).Size())
 }
 
@@ -123,21 +124,32 @@ func TestResourceSpansWireCompatibility(t *testing.T) {
 	assert.NotNil(t, wire1)
 
 	// Unmarshal from the wire to OTLP Protobuf in goproto's representation.
-	var goprotoRS otlptracegoproto.ResourceSpans
-	err = goproto.Unmarshal(wire1, &goprotoRS)
+	var goprotoMessage emptypb.Empty
+	err = goproto.Unmarshal(wire1, &goprotoMessage)
 	assert.NoError(t, err)
 
 	// Marshal to the wire again.
-	wire2, err := goproto.Marshal(&goprotoRS)
+	wire2, err := goproto.Marshal(&goprotoMessage)
 	assert.NoError(t, err)
 	assert.NotNil(t, wire2)
 
 	// Unmarshal from the wire into gogoproto's representation.
 	var gogoprotoRS2 otlptrace.ResourceSpans
-	err = gogoproto.Unmarshal(wire1, &gogoprotoRS2)
+	err = gogoproto.Unmarshal(wire2, &gogoprotoRS2)
 	assert.NoError(t, err)
 
 	// Now compare that the original and final ProtoBuf messages are the same.
 	// This proves that goproto and gogoproto marshaling/unmarshaling are wire compatible.
-	assert.True(t, gogoproto.Equal(*pdataRS.orig, &gogoprotoRS2))
+	assert.EqualValues(t, *pdataRS.orig, &gogoprotoRS2)
+}
+
+func TestTraces_ToOtlpProtoBytes(t *testing.T) {
+	td := NewTraces()
+	bytes, err := td.ToOtlpProtoBytes()
+	assert.Nil(t, err)
+
+	etsr := otlpcollectortrace.ExportTraceServiceRequest{}
+	err = gogoproto.Unmarshal(bytes, &etsr)
+	assert.Nil(t, err)
+	assert.EqualValues(t, etsr.ResourceSpans, TracesToOtlp(td))
 }

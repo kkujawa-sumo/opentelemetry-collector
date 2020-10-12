@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@ import (
 	"go.uber.org/zap"
 
 	"go.opentelemetry.io/collector/consumer/consumerdata"
+	"go.opentelemetry.io/collector/consumer/pdata"
 )
 
 func TestStringTagFilter(t *testing.T) {
@@ -71,7 +72,7 @@ func TestStringTagFilter(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Desc, func(t *testing.T) {
 			u, _ := uuid.NewRandom()
-			decision, err := filter.Evaluate(u[:], c.Trace)
+			decision, err := filter.Evaluate(pdata.NewTraceID(u[:]), c.Trace)
 			assert.NoError(t, err)
 			assert.Equal(t, decision, c.Decision)
 		})

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,10 +36,10 @@ func appendSystemSpecificProcessesMetrics(metrics pdata.MetricSlice, startIndex 
 	return nil
 }
 
-func initializeProcessesMetric(metric pdata.Metric, descriptor pdata.MetricDescriptor, now pdata.TimestampUnixNano, value int64) {
-	descriptor.CopyTo(metric.MetricDescriptor())
+func initializeProcessesMetric(metric pdata.Metric, descriptor pdata.Metric, now pdata.TimestampUnixNano, value int64) {
+	descriptor.CopyTo(metric)
 
-	ddps := metric.Int64DataPoints()
+	ddps := metric.IntSum().DataPoints()
 	ddps.Resize(1)
 	ddps.At(0).SetTimestamp(now)
 	ddps.At(0).SetValue(value)

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,6 @@ import (
 	"go.opentelemetry.io/collector/config/configgrpc"
 	"go.opentelemetry.io/collector/config/configtls"
 	"go.opentelemetry.io/collector/consumer/pdata"
-	"go.opentelemetry.io/collector/consumer/pdatautil"
 	otlplogs "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/logs/v1"
 	otlpmetrics "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/metrics/v1"
 	otlptraces "go.opentelemetry.io/collector/internal/data/opentelemetry-proto-gen/collector/trace/v1"
@@ -134,14 +133,7 @@ func (r *mockMetricsReceiver) Export(
 	req *otlpmetrics.ExportMetricsServiceRequest,
 ) (*otlpmetrics.ExportMetricsServiceResponse, error) {
 	atomic.AddInt32(&r.requestCount, 1)
-	recordCount := 0
-	for _, rs := range req.ResourceMetrics {
-		for _, il := range rs.InstrumentationLibraryMetrics {
-			for _, m := range il.Metrics {
-				recordCount += len(m.DoubleDataPoints) + len(m.Int64DataPoints) + len(m.HistogramDataPoints) + len(m.SummaryDataPoints)
-			}
-		}
-	}
+	_, recordCount := pdata.MetricsFromOtlp(req.ResourceMetrics).MetricAndDataPointCount()
 	atomic.AddInt32(&r.totalItems, int32(recordCount))
 	r.lastRequest = req
 	r.metadata, _ = metadata.FromIncomingContext(ctx)
@@ -272,7 +264,7 @@ func TestSendMetrics(t *testing.T) {
 	assert.EqualValues(t, 0, atomic.LoadInt32(&rcv.requestCount))
 
 	// Send empty trace.
-	md := pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataEmpty())
+	md := testdata.GenerateMetricsEmpty()
 	assert.NoError(t, exp.ConsumeMetrics(context.Background(), md))
 
 	// Wait until it is received.
@@ -284,10 +276,10 @@ func TestSendMetrics(t *testing.T) {
 	assert.EqualValues(t, 0, atomic.LoadInt32(&rcv.totalItems))
 
 	// A trace with 2 spans.
-	md = pdatautil.MetricsFromInternalMetrics(testdata.GenerateMetricDataTwoMetrics())
+	md = testdata.GenerateMetricsTwoMetrics()
 
 	expectedOTLPReq := &otlpmetrics.ExportMetricsServiceRequest{
-		ResourceMetrics: testdata.GenerateMetricOtlpTwoMetrics(),
+		ResourceMetrics: testdata.GenerateMetricsOtlpTwoMetrics(),
 	}
 
 	err = exp.ConsumeMetrics(context.Background(), md)
@@ -451,7 +443,7 @@ func TestSendLogData(t *testing.T) {
 	defer rcv.srv.GracefulStop()
 
 	// Start an OTLP exporter and point to the receiver.
-	factory := NewFactory().(component.LogsExporterFactory)
+	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
 	cfg.GRPCClientSettings = configgrpc.GRPCClientSettings{
 		Endpoint: ln.Addr().String(),

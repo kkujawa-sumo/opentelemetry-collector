@@ -1,10 +1,10 @@
-// Copyright 2020, OpenTelemetry Authors
+// Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -56,6 +56,16 @@ func constructAttributeKeyValue(key string, value interface{}) *otlpcommon.KeyVa
 			Key:   key,
 			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_BoolValue{BoolValue: cast.ToBool(val)}},
 		}
+	case *otlpcommon.ArrayValue:
+		attr = otlpcommon.KeyValue{
+			Key:   key,
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_ArrayValue{ArrayValue: val}},
+		}
+	case *otlpcommon.KeyValueList:
+		attr = otlpcommon.KeyValue{
+			Key:   key,
+			Value: &otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_KvlistValue{KvlistValue: val}},
+		}
 	default:
 		attr = otlpcommon.KeyValue{
 			Key:   key,
@@ -83,20 +93,20 @@ func loadPictOutputFile(fileName string) ([][]string, error) {
 	return reader.ReadAll()
 }
 
-func generateTraceID(random io.Reader) []byte {
+func generateTraceID(random io.Reader) otlpcommon.TraceID {
 	var r [16]byte
 	_, err := random.Read(r[:])
 	if err != nil {
 		panic(err)
 	}
-	return r[:]
+	return otlpcommon.NewTraceID(r[:])
 }
 
-func generateSpanID(random io.Reader) []byte {
+func generateSpanID(random io.Reader) otlpcommon.SpanID {
 	var r [8]byte
 	_, err := random.Read(r[:])
 	if err != nil {
 		panic(err)
 	}
-	return r[:]
+	return otlpcommon.NewSpanID(r[:])
 }
