@@ -43,7 +43,7 @@ processors:
               {
                 name: "dur",
                 spans_per_second: 50,
-                duration: {min_duration_micros: 9000000 }
+                properties: {min_duration_micros: 9000000 }
               },
               {
                 name: "everything_else",
@@ -53,8 +53,12 @@ processors:
          },
          {
             name: test-policy-6,
-            type: duration,
-            duration: {min_duration_micros: 100000}
+            type: properties,
+            properties: {
+              name_pattern: "foo.*",
+              min_number_of_spans: 10,
+              min_duration_micros: 9000000
+            }
          },
       ]
 

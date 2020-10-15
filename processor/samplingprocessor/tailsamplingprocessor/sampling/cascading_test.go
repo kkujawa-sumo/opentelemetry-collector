@@ -72,6 +72,8 @@ func createTrace(numSpans int, durationMicros int64) *TraceData {
 }
 
 func createCascadingEvaluator() PolicyEvaluator {
+	testValue := int64(10000)
+
 	config := tsconfig.PolicyCfg{
 		Name:           "test-policy-5",
 		Type:           tsconfig.Cascading,
@@ -80,8 +82,8 @@ func createCascadingEvaluator() PolicyEvaluator {
 			{
 				Name:           "duration",
 				SpansPerSecond: 10,
-				DurationCfg: &tsconfig.DurationCfg{
-					MinDurationMicros: 10000,
+				PropertiesCfg: &tsconfig.PropertiesCfg{
+					MinDurationMicros: &testValue,
 				},
 			},
 			{

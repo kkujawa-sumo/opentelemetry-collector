@@ -34,8 +34,8 @@ const (
 	StringAttribute PolicyType = "string_attribute"
 	// RateLimiting allows all traces until the specified limits are satisfied.
 	RateLimiting PolicyType = "rate_limiting"
-	// Duration allows all traces that extend specific provided duration
-	Duration PolicyType = "duration"
+	// Properties allows all traces that conform to specified properties.
+	Properties PolicyType = "properties"
 	// Cascading provides ability to specify several rules organized by priority an with ingestion budget
 	Cascading PolicyType = "cascading"
 )
@@ -52,8 +52,8 @@ type PolicyCfg struct {
 	StringAttributeCfg StringAttributeCfg `mapstructure:"string_attribute"`
 	// Configs for rate limiting filter sampling policy evaluator.
 	RateLimitingCfg RateLimitingCfg `mapstructure:"rate_limiting"`
-	// Configs for duration filter sampling policy evaluator.
-	DurationCfg DurationCfg `mapstructure:"duration"`
+	// Configs for properties sampling policy evaluator.
+	PropertiesCfg PropertiesCfg `mapstructure:"properties"`
 	// SpansPerSecond specifies the total budget that should never be exceeded for cascading rule
 	SpansPerSecond int64 `mapstructure:"spans_per_second"`
 	// Rules provide a list of prioritized rules for filling the budgets
@@ -70,14 +70,18 @@ type CascadingRuleCfg struct {
 	NumericAttributeCfg *NumericAttributeCfg `mapstructure:"numeric_attribute"`
 	// Configs for string attribute filter sampling policy evaluator.
 	StringAttributeCfg *StringAttributeCfg `mapstructure:"string_attribute"`
-	// Configs for duration filter sampling policy evaluator.
-	DurationCfg *DurationCfg `mapstructure:"duration"`
+	// Configs for properties sampling policy evaluator.
+	PropertiesCfg *PropertiesCfg `mapstructure:"properties"`
 }
 
-// DurationCfg holds the configurable settings to create a duration filter
-type DurationCfg struct {
-	// MinDurationMicros is the minimum duration of trace to be considered a match.
-	MinDurationMicros int64 `mapstructure:"min_duration_micros"`
+// PropertiesCfg holds the configurable settings to create a duration filter
+type PropertiesCfg struct {
+	// NamePattern (optional) describes a regular expression that must be met by any span operation name.
+	NamePattern *string `mapstructure:"name_pattern"`
+	// MinDurationMicros (optional) is the minimum duration of trace to be considered a match.
+	MinDurationMicros *int64 `mapstructure:"min_duration_micros"`
+	// MinNumberOfSpans (optional) is the minimum number spans that must be present in a matching trace.
+	MinNumberOfSpans *int `mapstructure:"min_number_of_spans"`
 }
 
 // NumericAttributeCfg holds the configurable settings to create a numeric attribute filter

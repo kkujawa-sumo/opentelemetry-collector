@@ -17,7 +17,7 @@ Multiple policies exist today and it is straight forward to add more. These incl
 - `string_attribute`: Sample based on string attributes
 - `rate_limiting`: Sample based on rate
 - `cascading`: Sample based on a set of cascading rules
-- `duration`: Sample based on duration of trace (difference between maximum end time and minimum start time)
+- `properties`: Sample based on properties (duration, operation name, number of spans) 
 
 The following configuration options can also be modified:
 - `decision_wait` (default = 30s): Wait time since the first span of a trace before making a sampling decision
@@ -69,7 +69,7 @@ processors:
               {
                 name: "some-other-name",
                 spans_per_second: 50,
-                duration: {min_duration_micros: 9000000 }
+                properties: {min_duration_micros: 9000000 }
               },
               {
                 # This rule will match anything and take any left bandwidth available, up to 
@@ -81,8 +81,12 @@ processors:
         },
         {
            name: test-policy-6,
-           type: duration,
-           duration: {min_duration_micros: 100000}
+           type: properties,
+           properties: {
+              name_pattern: "foo.*",
+              min_number_of_spans: 10,
+              min_duration_micros: 100000
+           }
         },
       ]
 ```
