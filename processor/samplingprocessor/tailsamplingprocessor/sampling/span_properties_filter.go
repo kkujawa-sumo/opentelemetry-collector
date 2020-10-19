@@ -38,16 +38,25 @@ var _ PolicyEvaluator = (*spanPropertiesFilter)(nil)
 // the specified criteria
 func NewSpanPropertiesFilter(logger *zap.Logger, operationNamePattern *string, minDurationMicros *int64, minNumberOfSpans *int) (PolicyEvaluator, error) {
 	var operationRe *regexp.Regexp
+	var err error
+
+	if operationNamePattern == nil && minDurationMicros == nil && minNumberOfSpans == nil {
+		return nil, errors.New("at least one property must be defined")
+	}
+
 	if operationNamePattern != nil {
-		var err error
 		operationRe, err = regexp.Compile(*operationNamePattern)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if operationNamePattern == nil && minDurationMicros == nil && minNumberOfSpans == nil {
-		return nil, errors.New("at least one property must be defined")
+	if minDurationMicros != nil && *minDurationMicros < int64(0) {
+		return nil, errors.New("minimum span duration must be a non-negative number")
+	}
+
+	if minNumberOfSpans != nil && *minNumberOfSpans < 1 {
+		return nil, errors.New("minimum number of spans must be a positive number")
 	}
 
 	return &spanPropertiesFilter{
@@ -119,22 +128,25 @@ func (df *spanPropertiesFilter) Evaluate(_ pdata.TraceID, trace *TraceData) (Dec
 		}
 	}
 
-	operationNameConditionMet := true
-	minDurationConditionMet := true
-	minSpanCountConditionMet := true
-
+	var operationNameConditionMet, minDurationConditionMet, minSpanCountConditionMet bool
 
 	if df.operationRe != nil {
 		operationNameConditionMet = matchingOperationFound
+	} else {
+		operationNameConditionMet = true
 	}
 
 	if df.minDurationMicros != nil {
 		// Sanity check first
 		minDurationConditionMet = maxEndTime > minStartTime && maxEndTime-minStartTime >= *df.minDurationMicros
+	} else {
+		minDurationConditionMet = true
 	}
 
 	if df.minNumberOfSpans != nil {
 		minSpanCountConditionMet = spanCount >= *df.minNumberOfSpans
+	} else {
+		minSpanCountConditionMet = true
 	}
 
 	if minDurationConditionMet && operationNameConditionMet && minSpanCountConditionMet {
