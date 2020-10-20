@@ -39,6 +39,10 @@ func TestLoadConfig(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, cfg)
 
+	minDurationValue := int64(9000000)
+	minSpansValue := 10
+	namePatternValue := "foo.*"
+
 	assert.Equal(t, cfg.Processors["tail_sampling"],
 		&config.Config{
 			ProcessorSettings: configmodels.ProcessorSettings{
@@ -82,8 +86,8 @@ func TestLoadConfig(t *testing.T) {
 						{
 							Name: "dur",
 							SpansPerSecond: 50,
-							DurationCfg: &config.DurationCfg{
-								MinDurationMicros: 9000000,
+							PropertiesCfg: &config.PropertiesCfg{
+								MinDurationMicros: &minDurationValue,
 							},
 						},
 						{
@@ -94,9 +98,11 @@ func TestLoadConfig(t *testing.T) {
 				},
 				{
 					Name:            "test-policy-6",
-					Type:            config.Duration,
-					DurationCfg: config.DurationCfg{
-						MinDurationMicros: 100000,
+					Type:            config.Properties,
+					PropertiesCfg: config.PropertiesCfg{
+						NamePattern: &namePatternValue,
+						MinDurationMicros: &minDurationValue,
+						MinNumberOfSpans: &minSpansValue,
 					},
 				},
 			},

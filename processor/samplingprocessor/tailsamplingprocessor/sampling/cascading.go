@@ -40,7 +40,7 @@ type cascadingPolicy struct {
 }
 
 type cascadingRuleEvaluation struct {
-	// In fact, this can be only NumericTagFilter, StringTagFilter, Duration or AlwaysSample
+	// In fact, this can be only NumericTagFilter, StringTagFilter, Properties or AlwaysSample
 	evaluator PolicyEvaluator
 
 	context context.Context
@@ -125,7 +125,7 @@ func NewCascadingFilter(logger *zap.Logger, cfg *config.PolicyCfg) (PolicyEvalua
 		if ruleCfg.NumericAttributeCfg != nil {
 			attributesSet += 1
 		}
-		if ruleCfg.DurationCfg != nil {
+		if ruleCfg.PropertiesCfg != nil {
 			attributesSet += 1
 		}
 
@@ -142,8 +142,12 @@ func NewCascadingFilter(logger *zap.Logger, cfg *config.PolicyCfg) (PolicyEvalua
 				ruleCfg.NumericAttributeCfg.Key,
 				ruleCfg.NumericAttributeCfg.MinValue,
 				ruleCfg.NumericAttributeCfg.MaxValue)
-		} else if ruleCfg.DurationCfg != nil {
-			evaluator = NewDurationFilter(logger, ruleCfg.DurationCfg.MinDurationMicros)
+		} else if ruleCfg.PropertiesCfg != nil {
+			var err error
+			evaluator, err = NewSpanPropertiesFilter(logger, ruleCfg.PropertiesCfg.NamePattern, ruleCfg.PropertiesCfg.MinDurationMicros, ruleCfg.PropertiesCfg.MinNumberOfSpans)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		ctx, _ := tag.New(context.Background(), tag.Upsert(tagRuleKey, ruleCfg.Name))
