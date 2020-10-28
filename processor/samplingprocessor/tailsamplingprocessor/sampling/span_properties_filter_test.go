@@ -15,16 +15,13 @@
 package sampling
 
 import (
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"testing"
 	"time"
 
-	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
-	"go.opentelemetry.io/collector/consumer/consumerdata"
 	"go.opentelemetry.io/collector/consumer/pdata"
 )
 
@@ -119,27 +116,35 @@ func TestSpanPropertiesFilter(t *testing.T) {
 }
 
 func newTraceAttrs(operationName string, durationMicros int64, numberOfSpans int) *TraceData {
-	spans := make([]*tracepb.Span, 0)
+	endTs := time.Now().UnixNano()
+	startTs := endTs - durationMicros*1000
 
-	startTs := timestamppb.New(time.Unix(1544712660, 0).UTC())
-	endTs := timestamppb.New(time.Unix(1544712660, 0).UTC().Add(time.Duration(durationMicros) * time.Microsecond))
+
+
+	var traceBatches []pdata.Traces
+
+	traces := pdata.NewTraces()
+	traces.ResourceSpans().Resize(1)
+	rs := traces.ResourceSpans().At(0)
+	rs.Resource().InitEmpty()
+	rs.InstrumentationLibrarySpans().Resize(1)
+	ils := rs.InstrumentationLibrarySpans().At(0)
+
+	ils.Spans().Resize(numberOfSpans)
+
 
 	for i := 0; i < numberOfSpans; i++ {
-		span := &tracepb.Span{
-			Name: &tracepb.TruncatableString{Value: operationName},
-			StartTime: startTs,
-			EndTime: endTs,
-		}
-
-		spans = append(spans, span)
+		span := ils.Spans().At(i)
+		span.SetName(operationName)
+		span.SetStartTime(pdata.TimestampUnixNano(startTs))
+		span.SetEndTime(pdata.TimestampUnixNano(endTs))
 	}
 
+	traceBatches = append(traceBatches, traces)
+
+
 	return &TraceData{
-		ReceivedBatches: []consumerdata.TraceData{
-			{
-				Spans: spans,
-			},
-		},
+		ReceivedBatches: traceBatches,
 	}
 }
 

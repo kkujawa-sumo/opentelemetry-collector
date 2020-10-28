@@ -20,8 +20,6 @@ import (
 
 	"go.opentelemetry.io/collector/consumer/pdata"
 
-	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
 )
 
@@ -71,7 +69,7 @@ func NewSpanPropertiesFilter(logger *zap.Logger, operationNamePattern *string, m
 // after the sampling decision was already taken for the trace.
 // This gives the evaluator a chance to log any message/metrics and/or update any
 // related internal state.
-func (df *spanPropertiesFilter) OnLateArrivingSpans(earlyDecision Decision, spans []*tracepb.Span) error {
+func (df *spanPropertiesFilter) OnLateArrivingSpans(earlyDecision Decision, spans []*pdata.Span) error {
 	return nil
 }
 
@@ -80,8 +78,8 @@ func (df *spanPropertiesFilter) EvaluateSecondChance(_ pdata.TraceID, trace *Tra
 	return NotSampled, nil
 }
 
-func tsToMicros(ts *timestamp.Timestamp) int64 {
-	return ts.Seconds*1000000 + int64(ts.Nanos/1000)
+func tsToMicros(ts pdata.TimestampUnixNano) int64 {
+	return int64(ts/1000)
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
@@ -96,33 +94,39 @@ func (df *spanPropertiesFilter) Evaluate(_ pdata.TraceID, trace *TraceData) (Dec
 	maxEndTime := int64(0)
 
 	for _, batch := range batches {
-		spanCount += len(batch.Spans)
+		rs := batch.ResourceSpans()
 
-		for _, span := range batch.Spans {
-			if span == nil {
-				continue
-			}
+		for i := 0; i < rs.Len(); i++ {
+			ils := rs.At(i).InstrumentationLibrarySpans()
+			for j := 0; j < ils.Len(); j++ {
+				spans := ils.At(j).Spans()
+				spanCount += spans.Len()
+				for k := 0; k < spans.Len(); k++ {
+					span := spans.At(k)
 
-			if df.operationRe != nil && !matchingOperationFound {
-				if df.operationRe.MatchString(span.Name.Value) {
-					matchingOperationFound = true
-				}
-			}
-
-			if df.minDurationMicros != nil {
-				startTs := tsToMicros(span.StartTime)
-				endTs := tsToMicros(span.EndTime)
-
-				if minStartTime == 0 {
-					minStartTime = startTs
-					maxEndTime = endTs
-				} else {
-					if startTs < minStartTime {
-						minStartTime = startTs
+					if df.operationRe != nil && !matchingOperationFound {
+						if df.operationRe.MatchString(span.Name()) {
+							matchingOperationFound = true
+						}
 					}
-					if endTs > maxEndTime {
-						maxEndTime = endTs
+
+					if df.minDurationMicros != nil {
+						startTs := tsToMicros(span.StartTime())
+						endTs := tsToMicros(span.EndTime())
+
+						if minStartTime == 0 {
+							minStartTime = startTs
+							maxEndTime = endTs
+						} else {
+							if startTs < minStartTime {
+								minStartTime = startTs
+							}
+							if endTs > maxEndTime {
+								maxEndTime = endTs
+							}
+						}
 					}
+
 				}
 			}
 		}

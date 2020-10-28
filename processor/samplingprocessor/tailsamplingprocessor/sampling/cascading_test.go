@@ -15,49 +15,48 @@
 package sampling
 
 import (
-	"go.opentelemetry.io/collector/consumer/pdata"
 	"sync"
 	"testing"
 	"time"
 
-	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"go.opentelemetry.io/collector/consumer/consumerdata"
+	"go.opentelemetry.io/collector/consumer/pdata"
 	tsconfig "go.opentelemetry.io/collector/processor/samplingprocessor/tailsamplingprocessor/config"
 )
 
-func createSpan(durationMicros int64) tracepb.Span {
-	nowTs := time.Now().Unix()
-	startTime := timestamp.Timestamp{
-		Seconds: nowTs - durationMicros/1000000,
-		Nanos:   0,
-	}
-	endTime := timestamp.Timestamp{
-		Seconds: nowTs,
-		Nanos:   0,
-	}
+func fillSpan(span *pdata.Span, durationMicros int64) {
+	nowTs := time.Now().UnixNano()
+	startTime := nowTs - durationMicros*1000
 
-	return tracepb.Span{
-		Attributes: &tracepb.Span_Attributes{
-			AttributeMap: map[string]*tracepb.AttributeValue{
-				"foo": {Value: &tracepb.AttributeValue_IntValue{IntValue: 55}},
-			},
-		},
-		StartTime: &startTime,
-		EndTime:   &endTime,
-	}
+	span.Attributes().InsertInt("foo", 55)
+	span.SetStartTime(pdata.TimestampUnixNano(startTime))
+	span.SetEndTime(pdata.TimestampUnixNano(nowTs))
 }
 
 func createTrace(numSpans int, durationMicros int64) *TraceData {
-	var spans []*tracepb.Span
+	var traceBatches []pdata.Traces
+
+	traces := pdata.NewTraces()
+	traces.ResourceSpans().Resize(1)
+	rs := traces.ResourceSpans().At(0)
+	rs.Resource().InitEmpty()
+	rs.InstrumentationLibrarySpans().Resize(1)
+	ils := rs.InstrumentationLibrarySpans().At(0)
+
+	ils.Spans().Resize(numSpans)
+
 
 	for i := 0; i < numSpans; i++ {
-		span := createSpan(durationMicros)
-		spans = append(spans, &span)
+		span := ils.Spans().At(i)
+		//span.SetTraceID(pdata.NewTraceID([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}))
+		//span.SetSpanID(pdata.NewSpanID([]byte{1, 2, 3, 4, 5, 6, 7, byte(i)}))
+
+		fillSpan(&span, durationMicros)
 	}
+
+	traceBatches = append(traceBatches, traces)
 
 	return &TraceData{
 		Mutex:        sync.Mutex{},
@@ -65,9 +64,7 @@ func createTrace(numSpans int, durationMicros int64) *TraceData {
 		ArrivalTime:  time.Time{},
 		DecisionTime: time.Time{},
 		SpanCount:    int64(numSpans),
-		ReceivedBatches: []consumerdata.TraceData{{
-			Spans: spans,
-		}},
+		ReceivedBatches: traceBatches,
 	}
 }
 
