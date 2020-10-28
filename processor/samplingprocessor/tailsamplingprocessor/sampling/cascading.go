@@ -23,7 +23,6 @@ import (
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"time"
 
-	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"go.uber.org/zap"
 
 	"go.opentelemetry.io/collector/processor/samplingprocessor/tailsamplingprocessor/config"
@@ -170,7 +169,7 @@ func NewCascadingFilter(logger *zap.Logger, cfg *config.PolicyCfg) (PolicyEvalua
 // after the sampling decision was already taken for the trace.
 // This gives the evaluator a chance to log any message/metrics and/or update any
 // related internal state.
-func (cp *cascadingPolicy) OnLateArrivingSpans(earlyDecision Decision, spans []*tracepb.Span) error {
+func (cp *cascadingPolicy) OnLateArrivingSpans(earlyDecision Decision, spans []*pdata.Span) error {
 	if earlyDecision == Sampled {
 		// Update the current rate, this event means that spans were sampled nevertheless due to previous decision
 		cp.updateRate(time.Now().Unix(), int64(len(spans)))
