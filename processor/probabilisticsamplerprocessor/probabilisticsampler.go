@@ -19,6 +19,7 @@ import (
 	"strconv"
 
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componenterror"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/model/pdata"
 	"go.opentelemetry.io/collector/processor/processorhelper"
@@ -27,6 +28,11 @@ import (
 // samplingPriority has the semantic result of parsing the "sampling.priority"
 // attribute per OpenTracing semantic conventions.
 type samplingPriority int
+
+
+const (
+	AttributeSamplingProbability = "sampling.probability"
+)
 
 const (
 	// deferDecision means that the decision if a span will be "sampled" (ie.:
@@ -49,27 +55,68 @@ const (
 )
 
 type tracesamplerprocessor struct {
-	scaledSamplingRate uint32
-	hashSeed           uint32
+	nextConsumer        consumer.Traces
+	scaledSamplingRate  uint32
+	samplingProbability float64
+	hashSeed            uint32
 }
 
 // newTracesProcessor returns a processor.TracesProcessor that will perform head sampling according to the given
 // configuration.
 func newTracesProcessor(nextConsumer consumer.Traces, cfg *Config) (component.TracesProcessor, error) {
+	if nextConsumer == nil {
+		return nil, componenterror.ErrNilNextConsumer
+	}
+
 	tsp := &tracesamplerprocessor{
+		nextConsumer: nextConsumer,
 		// Adjust sampling percentage on private so recalculations are avoided.
-		scaledSamplingRate: uint32(cfg.SamplingPercentage * percentageScaleFactor),
-		hashSeed:           cfg.HashSeed,
+		scaledSamplingRate:  uint32(cfg.SamplingPercentage * percentageScaleFactor),
+		samplingProbability: float64(cfg.SamplingPercentage) * 0.01,
+		hashSeed:            cfg.HashSeed,
 	}
 
 	return processorhelper.NewTracesProcessor(
 		cfg,
 		nextConsumer,
-		tsp.processTraces,
-		processorhelper.WithCapabilities(consumer.Capabilities{MutatesData: true}))
+		tsp.ProcessTraces,
+		processorhelper.WithCapabilities(consumer.Capabilities{MutatesData: false}))
 }
 
-func (tsp *tracesamplerprocessor) processTraces(_ context.Context, td pdata.Traces) (pdata.Traces, error) {
+func (tsp *tracesamplerprocessor) Capabilities() consumer.Capabilities {
+	return consumer.Capabilities{
+		MutatesData: false,
+	}
+}
+
+func (tsp *tracesamplerprocessor) Start(ctx context.Context, host component.Host) error {
+	return nil
+}
+
+func (tsp *tracesamplerprocessor) Shutdown(ctx context.Context) error {
+	return nil
+}
+
+// func (tsp *tracesamplerprocessor) ConsumeTraces(ctx context.Context, td pdata.Traces) error {
+// 	rspans := td.ResourceSpans()
+// 	sampledTraceData := pdata.NewTraces()
+// 	for i := 0; i < rspans.Len(); i++ {
+// 		tsp.ProcessTraces(rspans.At(i), sampledTraceData)
+// 	}
+// 	return tsp.nextConsumer.ConsumeTraces(ctx, sampledTraceData)
+// }
+
+func (tsp *tracesamplerprocessor) updateSamplingProbability(sampledSpanAttributes pdata.AttributeMap) {
+	samplingProbability := tsp.samplingProbability
+	attr, found := sampledSpanAttributes.Get(AttributeSamplingProbability)
+	if found && attr.Type() == pdata.AttributeValueTypeDouble {
+		samplingProbability *= attr.DoubleVal()
+	}
+
+	sampledSpanAttributes.UpsertDouble(AttributeSamplingProbability, samplingProbability)
+}
+
+func (tsp *tracesamplerprocessor) ProcessTraces(_ context.Context, td pdata.Traces) (pdata.Traces, error) {
 	td.ResourceSpans().RemoveIf(func(rs pdata.ResourceSpans) bool {
 		rs.InstrumentationLibrarySpans().RemoveIf(func(ils pdata.InstrumentationLibrarySpans) bool {
 			ils.Spans().RemoveIf(func(s pdata.Span) bool {
