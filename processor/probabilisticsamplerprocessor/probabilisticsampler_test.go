@@ -28,6 +28,7 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/consumer/pdata"
+	"go.opentelemetry.io/collector/translator/conventions"
 	tracetranslator "go.opentelemetry.io/collector/translator/trace"
 )
 
@@ -71,6 +72,7 @@ func TestNewTraceProcessor(t *testing.T) {
 			if !tt.wantErr {
 				// The truncation below with uint32 cannot be defined at initialization (compiler error), performing it at runtime.
 				tt.want.(*tracesamplerprocessor).scaledSamplingRate = uint32(tt.cfg.SamplingPercentage * percentageScaleFactor)
+				tt.want.(*tracesamplerprocessor).samplingProbability = float64(tt.cfg.SamplingPercentage) * 0.01
 			}
 			got, err := newTraceProcessor(tt.nextConsumer, tt.cfg)
 			if (err != nil) != tt.wantErr {
@@ -221,15 +223,7 @@ func Test_tracesamplerprocessor_SamplingPercentageRange_MultipleResourceSpans(t 
 
 // Test_tracesamplerprocessor_SpanSamplingPriority checks if handling of "sampling.priority" is correct.
 func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
-	singleSpanWithAttrib := func(key string, attribValue pdata.AttributeValue) pdata.Traces {
-		traces := pdata.NewTraces()
-		traces.ResourceSpans().Resize(1)
-		rs := traces.ResourceSpans().At(0)
-		rs.InstrumentationLibrarySpans().Resize(1)
-		instrLibrarySpans := rs.InstrumentationLibrarySpans().At(0)
-		instrLibrarySpans.Spans().Append(getSpanWithAttributes(key, attribValue))
-		return traces
-	}
+
 	tests := []struct {
 		name    string
 		cfg     Config
@@ -241,7 +235,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 0.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"sampling.priority",
 				pdata.NewAttributeValueInt(2)),
 			sampled: true,
@@ -251,7 +245,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 0.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"sampling.priority",
 				pdata.NewAttributeValueDouble(1)),
 			sampled: true,
@@ -261,7 +255,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 0.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"sampling.priority",
 				pdata.NewAttributeValueString("1")),
 			sampled: true,
@@ -271,7 +265,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 100.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"sampling.priority",
 				pdata.NewAttributeValueInt(0)),
 		},
@@ -280,7 +274,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 100.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"sampling.priority",
 				pdata.NewAttributeValueDouble(0)),
 		},
@@ -289,7 +283,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 100.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"sampling.priority",
 				pdata.NewAttributeValueString("0")),
 		},
@@ -298,7 +292,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 0.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"no.sampling.priority",
 				pdata.NewAttributeValueInt(2)),
 		},
@@ -307,7 +301,7 @@ func Test_tracesamplerprocessor_SpanSamplingPriority(t *testing.T) {
 			cfg: Config{
 				SamplingPercentage: 100.0,
 			},
-			td: singleSpanWithAttrib(
+			td: getTracesWithSpanWithAttribute(
 				"no.sampling.priority",
 				pdata.NewAttributeValueInt(2)),
 			sampled: true,
@@ -410,11 +404,74 @@ func Test_parseSpanSamplingPriority(t *testing.T) {
 	}
 }
 
+// Test_tracesamplerprocessor_SamplingProbabilityAttribute verifies if the attribute describing current sampling rate is included in sampled spans
+func Test_tracesamplerprocessor_SamplingProbabilityAttribute(t *testing.T) {
+	cfg := Config{
+		SamplingPercentage: 100.0,
+	}
+
+	tests := []struct {
+		name                             string
+		traces                           pdata.Traces
+		wantSamplingProbabilityAttribute pdata.AttributeValue
+	}{
+		{
+			name:                             "simple_span",
+			traces:                           getTracesWithSpanWithAttribute("foo", pdata.NewAttributeValueString("bar")),
+			wantSamplingProbabilityAttribute: pdata.NewAttributeValueDouble(1.0),
+		},
+		{
+			name:                             "span_came_through_sampler_already",
+			traces:                           getTracesWithSpanWithAttribute(conventions.AttributeSamplingProbability, pdata.NewAttributeValueDouble(0.01)),
+			wantSamplingProbabilityAttribute: pdata.NewAttributeValueDouble(0.01),
+		},
+		{
+			name:                             "simple_with_invalid_attribute_value",
+			traces:                           getTracesWithSpanWithAttribute(conventions.AttributeSamplingProbability, pdata.NewAttributeValueString("bar")),
+			wantSamplingProbabilityAttribute: pdata.NewAttributeValueDouble(1.0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sink := new(consumertest.TracesSink)
+			tsp, err := newTraceProcessor(sink, cfg)
+			if err != nil {
+				t.Errorf("error when creating tracesamplerprocessor: %v", err)
+				return
+			}
+
+			if err := tsp.ConsumeTraces(context.Background(), tt.traces); err != nil {
+				t.Errorf("tracesamplerprocessor.ConsumeTraceData() error = %v", err)
+				return
+			}
+			assert.Equal(t, 1, sink.SpansCount())
+			for _, td := range sink.AllTraces() {
+				span := td.ResourceSpans().At(0).InstrumentationLibrarySpans().At(0).Spans().At(0)
+				attrValue, found := span.Attributes().Get(conventions.AttributeSamplingProbability)
+				assert.True(t, found, "Sampling probability attribute not found")
+				assert.Equal(t, tt.wantSamplingProbabilityAttribute, attrValue)
+			}
+			sink.Reset()
+		})
+	}
+}
+
 func getSpanWithAttributes(key string, value pdata.AttributeValue) pdata.Span {
 	span := pdata.NewSpan()
 	span.SetName("spanName")
 	span.Attributes().InitFromMap(map[string]pdata.AttributeValue{key: value})
 	return span
+}
+
+func getTracesWithSpanWithAttribute(key string, attribValue pdata.AttributeValue) pdata.Traces {
+	traces := pdata.NewTraces()
+	traces.ResourceSpans().Resize(1)
+	rs := traces.ResourceSpans().At(0)
+	rs.InstrumentationLibrarySpans().Resize(1)
+	instrLibrarySpans := rs.InstrumentationLibrarySpans().At(0)
+	instrLibrarySpans.Spans().Append(getSpanWithAttributes(key, attribValue))
+	return traces
 }
 
 // Test_hash ensures that the hash function supports different key lengths even if in
