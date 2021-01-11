@@ -24,7 +24,9 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/configtest"
+	"go.opentelemetry.io/collector/internal/processor/filterconfig"
 	"go.opentelemetry.io/collector/internal/processor/filtermetric"
+	"go.opentelemetry.io/collector/internal/processor/filterset"
 	fsregexp "go.opentelemetry.io/collector/internal/processor/filterset/regexp"
 )
 
@@ -307,6 +309,47 @@ func TestLoadingConfigExpr(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.filterName, func(t *testing.T) {
 			cfg := cfg.Processors[test.filterName]
+			assert.Equal(t, test.expCfg, cfg)
+		})
+	}
+}
+
+func TestLoadingConfigSpans(t *testing.T) {
+	factories, err := componenttest.ExampleComponents()
+	require.NoError(t, err)
+	factory := NewFactory()
+	factories.Processors[configmodels.Type(typeStr)] = factory
+	config, err := configtest.LoadConfigFile(t, path.Join(".", "testdata", "config_spans.yaml"), factories)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	tests := []struct {
+		filterName string
+		expCfg     configmodels.Processor
+	}{
+		{
+			filterName: "filter/spans",
+			expCfg: &Config{
+				ProcessorSettings: configmodels.ProcessorSettings{
+					NameVal: "filter/spans",
+					TypeVal: typeStr,
+				},
+				Spans: SpanFilters{
+					Include: &filterconfig.MatchProperties{
+						Config:    filterset.Config{MatchType: "regexp"},
+						SpanNames: []string{"prefix/.*", ".*/suffix"},
+					},
+					Exclude: &filterconfig.MatchProperties{
+						Config:    filterset.Config{MatchType: "regexp"},
+						SpanNames: []string{"other_prefix/.*", ".*/other_suffix"},
+					},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.filterName, func(t *testing.T) {
+			cfg := config.Processors[test.filterName]
 			assert.Equal(t, test.expCfg, cfg)
 		})
 	}
