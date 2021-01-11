@@ -16,14 +16,28 @@ package filterprocessor
 
 import (
 	"go.opentelemetry.io/collector/config"
+	"go.opentelemetry.io/collector/internal/processor/filterconfig"
 	"go.opentelemetry.io/collector/internal/processor/filtermetric"
 )
 
 // Config defines configuration for Resource processor.
 type Config struct {
 	config.ProcessorSettings `mapstructure:",squash"` // squash ensures fields are correctly decoded in embedded struct
+	Metrics                  MetricFilters            `mapstructure:"metrics"`
+	Spans                    SpanFilters              `mapstructure:"spans"`
+}
 
-	Metrics MetricFilters `mapstructure:"metrics"`
+// SpanFilters filters by Span properties
+type SpanFilters struct {
+	// Include match properties describe spans that should be included in the Collector Service pipeline,
+	// all other spans should be dropped from further processing.
+	// If both Include and Exclude are specified, Include filtering occurs first.
+	Include *filterconfig.MatchProperties `mapstructure:"include"`
+
+	// Exclude match properties describe spans that should be excluded from the Collector Service pipeline,
+	// all other spans should be included.
+	// If both Include and Exclude are specified, Include filtering occurs first.
+	Exclude *filterconfig.MatchProperties `mapstructure:"exclude"`
 }
 
 // MetricFilters filters by Metric properties.
