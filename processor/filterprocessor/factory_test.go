@@ -77,8 +77,10 @@ func TestCreateProcessors(t *testing.T) {
 
 				tp, tErr := factory.CreateTracesProcessor(context.Background(), componenttest.NewNopProcessorCreateSettings(), cfg, consumertest.NewNop())
 				// Not implemented error
-				assert.NotNil(t, tErr)
-				assert.Nil(t, tp)
+				// assert.NotNil(t, tErr)
+				// assert.Nil(t, tp)
+				assert.Equal(t, test.succeed, tp != nil)
+				assert.Equal(t, test.succeed, tErr == nil)
 
 				mp, mErr := factory.CreateMetricsProcessor(context.Background(), componenttest.NewNopProcessorCreateSettings(), cfg, consumertest.NewNop())
 				assert.Equal(t, test.succeed, mp != nil)
