@@ -65,8 +65,8 @@ func createMetricsProcessor(
 func createTracesProcessor(
 	_ context.Context,
 	params component.ProcessorCreateParams,
-	cfg configmodels.Processor,
-	nextConsumer consumer.TracesConsumer,
+	cfg config.Processor,
+	nextConsumer consumer.Traces,
 ) (component.TracesProcessor, error) {
 	fp, err := newFilterSpanProcessor(params.Logger, cfg.(*Config))
 	if err != nil {

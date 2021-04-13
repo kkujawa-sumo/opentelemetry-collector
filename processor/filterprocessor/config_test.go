@@ -315,22 +315,22 @@ func TestLoadingConfigExpr(t *testing.T) {
 }
 
 func TestLoadingConfigSpans(t *testing.T) {
-	factories, err := componenttest.ExampleComponents()
+	factories, err := componenttest.NopFactories()
 	require.NoError(t, err)
 	factory := NewFactory()
-	factories.Processors[configmodels.Type(typeStr)] = factory
-	config, err := configtest.LoadConfigFile(t, path.Join(".", "testdata", "config_spans.yaml"), factories)
+	factories.Processors[config.Type(typeStr)] = factory
+	cfg, err := configtest.LoadConfigFile(t, path.Join(".", "testdata", "config_spans.yaml"), factories)
 	require.NoError(t, err)
-	require.NotNil(t, config)
+	require.NotNil(t, cfg)
 
 	tests := []struct {
 		filterName string
-		expCfg     configmodels.Processor
+		expCfg     config.Processor
 	}{
 		{
 			filterName: "filter/spans",
 			expCfg: &Config{
-				ProcessorSettings: configmodels.ProcessorSettings{
+				ProcessorSettings: &config.ProcessorSettings{
 					NameVal: "filter/spans",
 					TypeVal: typeStr,
 				},
@@ -349,8 +349,8 @@ func TestLoadingConfigSpans(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.filterName, func(t *testing.T) {
-			cfg := config.Processors[test.filterName]
-			assert.Equal(t, test.expCfg, cfg)
+			procConfig := cfg.Processors[test.filterName]
+			assert.Equal(t, test.expCfg, procConfig)
 		})
 	}
 }

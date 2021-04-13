@@ -351,7 +351,7 @@ func TestFilterSpanProcessor(t *testing.T) {
 			input := createTraces([]string{"get prefix/foo", "other_prefix/foo", "bar"})
 
 			cfg := &Config{
-				ProcessorSettings: configmodels.ProcessorSettings{
+				ProcessorSettings: &config.ProcessorSettings{
 					TypeVal: typeStr,
 					NameVal: typeStr,
 				},
