@@ -1,5 +1,5 @@
 receivers:
-  examplereceiver:
+  nop:
 
 processors:
   filter/spans:
@@ -18,15 +18,15 @@ processors:
           - .*/other_suffix
 
 exporters:
-  exampleexporter:
+  nop:
 
 service:
   pipelines:
     traces:
-      receivers: [examplereceiver]
+      receivers: [nop]
       processors: [filter/spans]
-      exporters: [exampleexporter]
+      exporters: [nop]
     metrics:
-      receivers: [examplereceiver]
+      receivers: [nop]
       processors: [filter/spans]
-      exporters: [exampleexporter]
+      exporters: [nop]
