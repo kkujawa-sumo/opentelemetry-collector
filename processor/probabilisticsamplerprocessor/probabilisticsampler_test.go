@@ -435,7 +435,7 @@ func Test_tracesamplerprocessor_SamplingProbabilityAttribute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sink := new(consumertest.TracesSink)
-			tsp, err := newTraceProcessor(sink, cfg)
+			tsp, err := newTracesProcessor(sink, cfg)
 			if err != nil {
 				t.Errorf("error when creating tracesamplerprocessor: %v", err)
 				return

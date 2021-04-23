@@ -72,7 +72,7 @@ func createTracesProcessor(
 	if err != nil {
 		return nil, err
 	}
-	return processorhelper.NewTraceProcessor(
+	return processorhelper.NewTracesProcessor(
 		cfg,
 		nextConsumer,
 		fp,
