@@ -475,11 +475,6 @@ func getSpanWithAttributes(key string, value pdata.AttributeValue) pdata.Span {
 	return span
 }
 
-func initSpanWithAttributes(key string, value pdata.AttributeValue, dest pdata.Span) {
-	dest.SetName("spanName")
-	dest.Attributes().InitFromMap(map[string]pdata.AttributeValue{key: value})
-}
-
 func getTracesWithSpanWithAttribute(key string, attribValue pdata.AttributeValue) pdata.Traces {
 	traces := pdata.NewTraces()
 	traces.ResourceSpans().Resize(1)
