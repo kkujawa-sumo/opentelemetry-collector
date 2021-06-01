@@ -93,15 +93,6 @@ func (tsp *tracesamplerprocessor) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (tsp *tracesamplerprocessor) ConsumeTraces(ctx context.Context, td pdata.Traces) error {
-	rspans := td.ResourceSpans()
-	sampledTraceData := pdata.NewTraces()
-	for i := 0; i < rspans.Len(); i++ {
-		tsp.processTraces(rspans.At(i), sampledTraceData)
-	}
-	return tsp.nextConsumer.ConsumeTraces(ctx, sampledTraceData)
-}
-
 func (tsp *tracesamplerprocessor) updateSamplingProbability(sampledSpanAttributes pdata.AttributeMap) {
 	samplingProbability := tsp.samplingProbability
 	attr, found := sampledSpanAttributes.Get(conventions.AttributeSamplingProbability)
@@ -110,43 +101,6 @@ func (tsp *tracesamplerprocessor) updateSamplingProbability(sampledSpanAttribute
 	}
 
 	sampledSpanAttributes.UpsertDouble(conventions.AttributeSamplingProbability, samplingProbability)
-}
-
-func (tsp *tracesamplerprocessor) processTraces(resourceSpans pdata.ResourceSpans, sampledTraceData pdata.Traces) {
-	scaledSamplingRate := tsp.scaledSamplingRate
-
-	sampledTraceData.ResourceSpans().Resize(sampledTraceData.ResourceSpans().Len() + 1)
-	rs := sampledTraceData.ResourceSpans().At(sampledTraceData.ResourceSpans().Len() - 1)
-	resourceSpans.Resource().CopyTo(rs.Resource())
-	rs.InstrumentationLibrarySpans().Resize(1)
-	spns := rs.InstrumentationLibrarySpans().At(0).Spans()
-
-	ilss := resourceSpans.InstrumentationLibrarySpans()
-	for j := 0; j < ilss.Len(); j++ {
-		ils := ilss.At(j)
-		for k := 0; k < ils.Spans().Len(); k++ {
-			span := ils.Spans().At(k)
-			sp := parseSpanSamplingPriority(span)
-			if sp == doNotSampleSpan {
-				// The OpenTelemetry mentions this as a "hint" we take a stronger
-				// approach and do not sample the span since some may use it to
-				// remove specific spans from traces.
-				continue
-			}
-
-			// If one assumes random trace ids hashing may seems avoidable, however, traces can be coming from sources
-			// with various different criteria to generate trace id and perhaps were already sampled without hashing.
-			// Hashing here prevents bias due to such systems.
-			tidBytes := span.TraceID().Bytes()
-			sampled := sp == mustSampleSpan ||
-				hash(tidBytes[:], tsp.hashSeed)&bitMaskHashBuckets < scaledSamplingRate
-
-			if sampled {
-				tsp.updateSamplingProbability(span.Attributes())
-				spns.Append(span)
-			}
-		}
-	}
 }
 
 func (tsp *tracesamplerprocessor) ProcessTraces(_ context.Context, td pdata.Traces) (pdata.Traces, error) {
@@ -167,6 +121,11 @@ func (tsp *tracesamplerprocessor) ProcessTraces(_ context.Context, td pdata.Trac
 				tidBytes := s.TraceID().Bytes()
 				sampled := sp == mustSampleSpan ||
 					hash(tidBytes[:], tsp.hashSeed)&bitMaskHashBuckets < tsp.scaledSamplingRate
+
+				if sampled {
+					tsp.updateSamplingProbability(s.Attributes())
+				}
+
 				return !sampled
 			})
 			// Filter out empty InstrumentationLibraryMetrics
