@@ -22,7 +22,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer/consumertest"
@@ -354,7 +356,7 @@ func TestFilterSpanProcessor(t *testing.T) {
 			next := new(consumertest.TracesSink)
 			fmp, err := factory.CreateTracesProcessor(
 				context.Background(),
-				component.ProcessorCreateParams{
+				component.ProcessorCreateSettings{
 					Logger: zap.NewNop(),
 				},
 				cfg,
