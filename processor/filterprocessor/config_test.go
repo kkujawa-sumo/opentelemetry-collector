@@ -273,7 +273,7 @@ func TestLoadingConfigSpans(t *testing.T) {
 	require.NoError(t, err)
 	factory := NewFactory()
 	factories.Processors[config.Type(typeStr)] = factory
-	cfg, err := configtest.LoadConfigFile(t, path.Join(".", "testdata", "config_spans.yaml"), factories)
+	cfg, err := configtest.LoadConfig(path.Join(".", "testdata", "config_spans.yaml"), factories)
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
