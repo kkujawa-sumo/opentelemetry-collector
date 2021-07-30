@@ -29,7 +29,6 @@ import (
 // attribute per OpenTracing semantic conventions.
 type samplingPriority int
 
-
 const (
 	AttributeSamplingProbability = "sampling.probability"
 )
@@ -134,6 +133,9 @@ func (tsp *tracesamplerprocessor) ProcessTraces(_ context.Context, td pdata.Trac
 				tidBytes := s.TraceID().Bytes()
 				sampled := sp == mustSampleSpan ||
 					hash(tidBytes[:], tsp.hashSeed)&bitMaskHashBuckets < tsp.scaledSamplingRate
+				if sampled {
+					tsp.updateSamplingProbability(s.Attributes())
+				}
 				return !sampled
 			})
 			// Filter out empty InstrumentationLibraryMetrics

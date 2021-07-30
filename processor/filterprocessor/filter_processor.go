@@ -199,26 +199,21 @@ func (fmp *filterProcessor) ProcessMetrics(_ context.Context, pdm pdata.Metrics)
 
 // ProcessTraces filters the given spans based off the filterProcessor's filters.
 func (fmp *filterProcessor) ProcessTraces(_ context.Context, pdt pdata.Traces) (pdata.Traces, error) {
-	rs := pdt.ResourceSpans()
-	for i := 0; i < rs.Len(); i++ {
-		rss := rs.At(i)
-		resource := rss.Resource()
-		ils := rss.InstrumentationLibrarySpans()
-
-		for j := 0; j < ils.Len(); j++ {
-			ilss := ils.At(j)
-			library := ilss.InstrumentationLibrary()
-			inputSpans := pdata.NewSpanSlice()
-			ilss.Spans().MoveAndAppendTo(inputSpans)
-			for k := 0; k < inputSpans.Len(); k++ {
-				span := inputSpans.At(k)
-				if fmp.shouldKeepSpan(span, resource, library) {
-					ilss.Spans().Append(span)
-				}
-			}
-		}
+	pdt.ResourceSpans().RemoveIf(func(rs pdata.ResourceSpans) bool {
+		resource := rs.Resource()
+		rs.InstrumentationLibrarySpans().RemoveIf(func(ils pdata.InstrumentationLibrarySpans) bool {
+			ils.Spans().RemoveIf(func(span pdata.Span) bool {
+				return !fmp.shouldKeepSpan(span, resource, ils.InstrumentationLibrary())
+			})
+			// Filter out empty InstrumentationLibraryMetrics
+			return ils.Spans().Len() == 0
+		})
+		// Filter out empty ResourceMetrics
+		return rs.InstrumentationLibrarySpans().Len() == 0
+	})
+	if pdt.ResourceSpans().Len() == 0 {
+		return pdt, processorhelper.ErrSkipProcessingData
 	}
-
 	return pdt, nil
 }
 

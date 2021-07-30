@@ -58,7 +58,7 @@ func createMetricsProcessor(
 	return processorhelper.NewMetricsProcessor(
 		cfg,
 		nextConsumer,
-		fp.processMetrics,
+		fp.ProcessMetrics,
 		processorhelper.WithCapabilities(processorCapabilities))
 }
 
@@ -75,6 +75,6 @@ func createTracesProcessor(
 	return processorhelper.NewTracesProcessor(
 		cfg,
 		nextConsumer,
-		fp,
+		fp.ProcessTraces,
 		processorhelper.WithCapabilities(processorCapabilities))
 }
